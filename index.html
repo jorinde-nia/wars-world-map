@@ -129,7 +129,7 @@
   .btn:disabled:hover { background: var(--control); }
   /* what is showing, and what the colours mean */
   .head-l { display: grid; gap: 8px; min-width: 0; }
-  .showing { margin: 0; font-size: 14px; color: var(--ink-soft); text-wrap: pretty; }
+  .showing { margin: 0; font-size: 14px; color: var(--ink-soft); text-wrap: pretty; min-height: 1.5em; }
   .showing b { font-weight: 600; color: var(--ink); }
   .head-r { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; }
   .head-r .legend { display: contents; }
@@ -198,6 +198,13 @@
   /* while a year is loading the map fades, so it never looks like the wrong year */
   #map { transition: opacity .2s; }
   .stage.loading #map { opacity: .35; }
+  /* loading: a ring in the middle of the map, from the first paint until the map and its data are drawn */
+  .spinner { display: none; position: absolute; left: 50%; top: 50%; width: 32px; height: 32px; margin: -16px 0 0 -16px;
+    border-radius: 50%; border: 3px solid var(--track); border-top-color: var(--ink); animation: spin .8s linear infinite; pointer-events: none; z-index: 3; }
+  .booting .spinner, .stage.loading .spinner { display: block; }
+  .booting .head-r, .booting .col, .booting .timeline { visibility: hidden; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
 
   /* map layers */
   .land { fill: var(--land); }
@@ -231,7 +238,7 @@
   }
 </style>
 
-<div class="wrap">
+<div class="wrap booting" id="wrap">
   <header>
     <div class="head-l">
       <h1>Wars World Map</h1>
@@ -255,6 +262,7 @@
   <div class="card" id="card">
     <div class="stage" id="stage">
       <svg id="map" role="img" aria-label="World map with current war regions in red"></svg>
+      <div class="spinner" role="status" aria-label="Loading"></div>
 
       <div class="toolbar" id="toolbar" role="toolbar" aria-label="Draw" hidden>
         <button class="chip" type="button" data-tool="war" aria-pressed="true"><span class="sw war"></span>War</button>
@@ -1595,6 +1603,9 @@ svg.on("pointerup.globe pointercancel.globe", ev => {
 svg.node().addEventListener("click", ev => { if (isGlobe() && globeMoved) { ev.stopPropagation(); globeMoved = false; } }, true);
 
 /* ---------- boot ---------- */
+// fetch the first year's data at the same time as the borders, not after
+if (srcInfo(source).years) loadYear(source, curYear(source)).catch(() => {});
+const booted = () => document.getElementById("wrap").classList.remove("booting");
 fetch("countries-50m.json").then(r => r.json()).then(topo => {
   const skip = new Set(["Antarctica", "Fr. S. Antarctic Lands"]);
   const geoms = { type: "GeometryCollection", geometries: topo.objects.countries.geometries.filter(g => !skip.has(g.properties.name)) };
@@ -1692,7 +1703,7 @@ fetch("countries-50m.json").then(r => r.json()).then(topo => {
   addEventListener("resize", () => { if (setViewBox()) svg.call(zoom.transform, d3.zoomIdentity); drawOverlay(); });
 
   redrawAll();
-  setSource(source);
+  setSource(source).finally(booted);
   connectStore();
   fetch("countries-110m.json").then(r => r.json()).then(t => {
     const g = { type: "GeometryCollection", geometries: t.objects.countries.geometries.filter(g => !skip.has(g.properties.name)) };
