@@ -195,6 +195,9 @@
   .timeline input::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--ink); border: 0; }
   .timeline output { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 9.5em; text-align: right; }
   .timeline output.past { color: var(--war); font-weight: 600; }
+  /* while a year is loading the map fades, so it never looks like the wrong year */
+  #map { transition: opacity .2s; }
+  .stage.loading #map { opacity: .35; }
 
   /* map layers */
   .land { fill: var(--land); }
@@ -551,10 +554,19 @@ function loadYear(id, y) {
   if (!yearCache.has(k)) yearCache.set(k, fetch(k + ".json").then(r => r.json()).catch(e => { yearCache.delete(k); throw e; }));
   return yearCache.get(k);
 }
+let loadingTimer = 0;
+function setLoading(on) {
+  clearTimeout(loadingTimer);
+  const st = document.getElementById("stage");
+  if (on) loadingTimer = setTimeout(() => st.classList.add("loading"), 120);   // only show it when loading is noticeable
+  else st.classList.remove("loading");
+}
 async function showYear(id, y) {
   yearOf[id] = y;
-  let data; try { data = await loadYear(id, y); } catch (e) { console.warn("Could not load", id, y, e); return; }
+  setLoading(true);
+  let data; try { data = await loadYear(id, y); } catch (e) { console.warn("Could not load", id, y, e); if (yearOf[id] === y) setLoading(false); return; }
   if (yearOf[id] !== y) return;   // the slider moved on while this year was loading
+  setLoading(false);
   srcData[id] = data;
   if (source === id) { closePop(); drawZones(); drawOverlay(); updateShowing(); }
   const [f, l] = yearsOf(id);
@@ -928,6 +940,7 @@ function openFighting(i, ev) {
 
 async function setSource(id) {
   const s = srcInfo(id);
+  setLoading(false);
   if (s.years && !srcData[id]) await showYear(id, curYear(id));
   if (s.file && !srcData[id]) {
     try {
@@ -1008,6 +1021,17 @@ function setYear() {
   if (y !== curYear(source) || !srcData[source]) showYear(source, y);
 }
 range.addEventListener("input", () => timeMode === "days" ? setDate() : setYear());
+// once someone reaches for the slider, fetch every year of this source, four at a time, so moving through time is instant
+const preloaded = new Set();
+function preloadYears() {
+  if (timeMode !== "years" || preloaded.has(source)) return;
+  const id = source, [f, l] = yearsOf(id); preloaded.add(id);
+  const todo = []; for (let y = l; y >= f; y--) todo.push(y);
+  const next = () => { const y = todo.shift(); if (y != null) loadYear(id, y).catch(() => {}).finally(next); };
+  for (let i = 0; i < 4; i++) next();
+}
+range.addEventListener("pointerdown", preloadYears);
+range.addEventListener("focus", preloadYears);
 setDate();
 
 /* ---------- info panel ---------- */
