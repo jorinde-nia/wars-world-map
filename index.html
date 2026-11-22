@@ -1,0 +1,1670 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}  .public .mv { display: none; }
+</style></head><body>
+<title>Wars World Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&display=swap">
+<style>
+  /* Layout: neutral page, one white card with a zoomable map. Everything else waits behind a click. */
+  :root {
+    --page: #F1F1F0;
+    --card: #FFFFFF;
+    --ink: #14130F;
+    --ink-soft: #4A4A48;
+    --muted: #7A7A78;
+    --border: #9C9C9A;
+    --land: #FFFFFF;
+    --water: #EAEEF1;
+    --war: #C8241B;
+    --spill: #F0A9A0;
+    --control: #F1F1F0;
+    --control-hover: #E4E4E2;
+    --control-on: #14130F;
+    --control-on-fg: #FFFFFF;
+    --track: #DCDCDA;
+    --shadow: 0 8px 28px rgba(20, 19, 15, 0.16);
+    --font: 'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page: #121212; --card: #1C1C1C; --ink: #F2F2F0; --ink-soft: #F2F2F0B8; --muted: #F2F2F07A;
+      --border: #5C5C5A; --land: #2A2A2A; --water: #161819; --war: #E0453A; --spill: #7A322B;
+      --control: #2A2A2A; --control-hover: #363636; --control-on: #F2F2F0; --control-on-fg: #121212;
+      --track: #3A3A3A; --shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #121212; --card: #1C1C1C; --ink: #F2F2F0; --ink-soft: #F2F2F0B8; --muted: #F2F2F07A;
+    --border: #5C5C5A; --land: #2A2A2A; --water: #161819; --war: #E0453A; --spill: #7A322B;
+    --control: #2A2A2A; --control-hover: #363636; --control-on: #F2F2F0; --control-on-fg: #121212;
+    --track: #3A3A3A; --shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+
+  [hidden] { display: none !important; }
+  body { background: var(--page); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.5; }
+  .wrap {
+    max-width: 1180px; margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: clamp(20px, 4vw, 40px) 40px;
+    display: grid; gap: clamp(16px, 2.4vw, 24px);
+  }
+  header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+  h1 { margin: 0; font-weight: 800; font-size: clamp(26px, 4.4vw, 46px); line-height: 1; letter-spacing: -0.03em; text-wrap: balance; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0; padding: 0; list-style: none; font-size: 14px; color: var(--ink-soft); }
+  .legend li { display: flex; align-items: center; gap: 8px; }
+  .sw { width: 14px; height: 14px; border-radius: 4px; flex: none; display: inline-block; }
+  .sw.war { background: var(--war); }
+  .sw.spill { background: var(--spill); }
+
+  /* the card */
+  .card { position: relative; background: var(--card); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; }
+  .stage { position: relative; }
+  #map { display: block; width: 100%; height: auto; max-width: 100%; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+  #map:active { cursor: grabbing; }
+  .card.editing #map { cursor: crosshair; }
+
+  .card.full { position: fixed; inset: 0; z-index: 50; border-radius: 0;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px); }
+  .card.full .stage { flex: 1; min-height: 0; }
+  .card.full #map { height: 100%; aspect-ratio: auto !important; }
+
+  /* round controls */
+  .btn {
+    width: 36px; height: 36px; border: 0; border-radius: 999px; padding: 0; flex: none;
+    display: grid; place-items: center; background: var(--control); color: var(--ink); cursor: pointer;
+    font: 600 13px/1 var(--font);
+  }
+  .btn:hover { background: var(--control-hover); }
+  .btn[aria-pressed="true"] { background: var(--control-on); color: var(--control-on-fg); }
+  .btn:focus-visible, .chip:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+  .btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .col { position: absolute; display: flex; flex-direction: column; gap: 4px; }
+  .zoom { right: 12px; bottom: 12px; }
+  .left { left: 12px; bottom: 12px; }
+
+  /* viewpoint menu */
+  .menu { position: absolute; left: 56px; bottom: 12px; background: var(--card); border-radius: 12px; box-shadow: var(--shadow);
+    padding: 4px; display: grid; gap: 2px; min-width: 170px; z-index: 5; }
+  .menu button { all: unset; cursor: pointer; padding: 8px 12px; border-radius: 8px; font-size: 14px; }
+  .menu button:hover, .menu button:focus-visible { background: var(--control); }
+  .menu button[aria-checked="true"] { font-weight: 600; }
+  .menu button { display: grid; gap: 1px; }
+  .menu .sub { font-size: 12px; font-weight: 400; color: var(--muted); }
+  .menu .group { padding: 8px 12px 2px; font-size: 12px; color: var(--muted); }
+  .menu hr { border: 0; height: 1px; background: var(--track); margin: 4px 8px; }
+  .menu { min-width: 220px; max-height: calc(100% - 24px); overflow-y: auto; overscroll-behavior: contain; }
+  .menu button[aria-checked="true"] { background: var(--control); }
+  /* data list: one calm row per source, owner first, date in a pill */
+  .menu.wide { padding: 6px; gap: 0; }
+  .menu button.src { grid-template-columns: 1fr auto; column-gap: 12px; row-gap: 2px; padding: 9px 10px; font-weight: 400; }
+  .menu .own { font-size: 14px; font-weight: 500; color: var(--ink); }
+  .menu .name { font-size: 13px; color: var(--muted); }
+  .menu .when { font-size: 11px; line-height: 1; color: var(--muted); align-self: center; white-space: nowrap;
+    padding: 4px 7px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--track); font-variant-numeric: tabular-nums; }
+  .menu button[aria-checked="true"] .own { font-weight: 600; }
+  .menu button[aria-checked="true"] .when { box-shadow: inset 0 0 0 1px var(--border); color: var(--ink-soft); }
+  .menu .lock { width: 12px; height: 12px; margin-left: 6px; vertical-align: -1px; fill: none; stroke: var(--muted); stroke-width: 2.2; }
+  .menu.wide .group { padding: 12px 10px 4px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .menu.wide .group:first-child { padding-top: 6px; }
+  .menu .name { grid-column: 1 / -1; }
+  .menu.wide { min-width: min(300px, calc(100% - 68px)); }
+  .toolbar input { height: 32px; border: 0; border-radius: 999px; padding: 0 12px; width: 150px; min-width: 0;
+    background: var(--control); color: var(--ink); font: 500 13px/1 var(--font); }
+  /* hover labels */
+  .tip { position: absolute; z-index: 9; pointer-events: none; padding: 6px 10px; border-radius: 8px; white-space: nowrap;
+    background: var(--control-on); color: var(--control-on-fg); font: 500 13px/1.2 var(--font); }
+  .btn:disabled { opacity: 0.35; cursor: default; }
+  .btn:disabled:hover { background: var(--control); }
+  /* what is showing, and what the colours mean */
+  .head-l { display: grid; gap: 8px; min-width: 0; }
+  .showing { margin: 0; font-size: 14px; color: var(--ink-soft); text-wrap: pretty; }
+  .showing b { font-weight: 600; color: var(--ink); }
+  .head-r { position: relative; display: flex; align-items: center; gap: 12px; }
+  .lginfo { width: 28px; height: 28px; }
+  .lginfo svg { width: 16px; height: 16px; }
+  .lgpop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; width: min(340px, calc(100vw - 32px));
+    background: var(--card); border-radius: 12px; box-shadow: var(--shadow); padding: 14px 16px; display: grid; gap: 10px; }
+  .lgpop .row { display: grid; grid-template-columns: 28px 1fr; gap: 2px 8px; align-items: baseline; font-size: 14px; }
+  .lgpop .row b { font-weight: 600; }
+  .lgpop .row span:last-child { grid-column: 2; color: var(--ink-soft); }
+  .lgpop .src { font-size: 13px; color: var(--muted); }
+  .legend li { cursor: help; border-radius: 6px; }
+  .lgtip { position: absolute; top: calc(100% + 8px); z-index: 61; max-width: min(280px, calc(100vw - 32px)); padding: 8px 12px;
+    border-radius: 8px; background: var(--control-on); color: var(--control-on-fg); font-size: 13px; line-height: 1.4; pointer-events: none; }
+  @keyframes nudge { 0%, 100% { transform: scale(1); } 40% { transform: scale(0.86); } 70% { transform: scale(1.06); } }
+  .btn.nudge { animation: nudge 360ms ease; }
+  @media (prefers-reduced-motion: reduce) { .btn.nudge { animation: none; } }
+  .toolbar .sep { width: 1px; align-self: stretch; margin: 4px 2px; background: var(--track); }
+
+  /* draw toolbar */
+  .toolbar { position: absolute; left: 12px; top: 12px; display: flex; flex-wrap: wrap; gap: 4px; padding: 4px;
+    background: var(--card); border-radius: 999px; box-shadow: var(--shadow); z-index: 4; max-width: calc(100% - 24px); }
+  .chip { border: 0; border-radius: 999px; height: 32px; padding: 0 12px; display: flex; align-items: center; gap: 6px;
+    background: transparent; color: var(--ink); cursor: pointer; font: 500 13px/1 var(--font); }
+  .chip:hover { background: var(--control); }
+  .chip[aria-pressed="true"] { background: var(--control-on); color: var(--control-on-fg); }
+  .chip .sw { width: 10px; height: 10px; border-radius: 3px; }
+  .chip svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .chip.done { background: var(--control); font-weight: 600; }
+
+  /* click card */
+  .pop { position: absolute; z-index: 6; width: min(300px, calc(100% - 24px)); background: var(--card); border-radius: 12px;
+    box-shadow: var(--shadow); padding: 14px 16px 16px; display: grid; gap: 6px; }
+  .pop h2 { margin: 0; padding-right: 28px; font-size: 16px; font-weight: 700; line-height: 1.3; text-wrap: balance; }
+  .pop p { margin: 0; font-size: 14px; color: var(--ink-soft); }
+  .pop .meta { color: var(--muted); font-size: 13px; }
+  .pop a { color: var(--ink); font-size: 14px; font-weight: 500; text-underline-offset: 3px; }
+  .pop .tags { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 14px; color: var(--ink-soft); }
+  .pop .tags span { display: flex; align-items: center; gap: 6px; }
+  .pop .tags button { all: unset; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  .x { position: absolute; right: 8px; top: 8px; width: 28px; height: 28px; }
+  .x svg { width: 15px; height: 15px; }
+
+  /* info panel */
+  .info { position: absolute; z-index: 7; top: 12px; right: 12px; bottom: 12px; width: min(340px, calc(100% - 24px));
+    background: var(--card); border-radius: 12px; box-shadow: var(--shadow); padding: 18px 20px; overflow-y: auto; }
+  .info h2 { margin: 0 0 12px; font-size: 18px; font-weight: 700; padding-right: 28px; }
+  .info h3 { margin: 18px 0 6px; font-size: 14px; font-weight: 600; }
+  .info p, .info li { margin: 0; font-size: 14px; color: var(--ink-soft); }
+  .info ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+  .info li { display: flex; gap: 8px; align-items: baseline; }
+  .info li .sw { transform: translateY(2px); }
+  .info b { color: var(--ink); font-weight: 600; }
+  .info a { color: var(--ink); text-underline-offset: 3px; }
+
+  /* timeline */
+  .timeline[hidden] { display: none; }
+  .timeline { display: flex; align-items: center; gap: 12px; padding: 4px 16px 14px; }
+  .timeline input { flex: 1; min-width: 0; appearance: none; -webkit-appearance: none; height: 20px; background: transparent; cursor: pointer; }
+  .timeline input::-webkit-slider-runnable-track { height: 2px; background: var(--track); border-radius: 2px; }
+  .timeline input::-moz-range-track { height: 2px; background: var(--track); border-radius: 2px; }
+  .timeline input::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -6px; border-radius: 50%; background: var(--ink); border: 0; }
+  .timeline input::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--ink); border: 0; }
+  .timeline output { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 9.5em; text-align: right; }
+  .timeline output.past { color: var(--war); font-weight: 600; }
+
+  /* map layers */
+  .land { fill: var(--land); }
+  .sphere { fill: var(--water); stroke: var(--border); stroke-width: 0.8; vector-effect: non-scaling-stroke; pointer-events: none; }
+  .borders { fill: none; stroke: var(--border); stroke-width: 0.6; stroke-linejoin: round; vector-effect: non-scaling-stroke; pointer-events: none; }
+  .z-war { fill: var(--war); }
+  .z-halo { fill: var(--spill); stroke: var(--spill); stroke-linejoin: round; }
+  .z-spill { fill: var(--spill); stroke: var(--spill); stroke-width: 3; stroke-linejoin: round; }
+  .u-war { fill: none; stroke: var(--war); stroke-linecap: round; stroke-linejoin: round; }
+  .u-halo, .u-spill { fill: none; stroke: var(--spill); stroke-linecap: round; stroke-linejoin: round; }
+  .zc { cursor: pointer; transition: opacity 160ms ease; }
+  .arrow { fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; pointer-events: none; transition: opacity 160ms ease; }
+  .head { fill: var(--ink); pointer-events: none; transition: opacity 160ms ease; }
+  .hit { fill: none; stroke: transparent; stroke-width: 16px; cursor: pointer; pointer-events: stroke; }
+  .dot { fill: var(--ink); stroke: var(--card); stroke-width: 2.5; cursor: pointer; transition: opacity 160ms ease; }
+  .preview { fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-dasharray: 4 4; pointer-events: none; }
+  #map.focus [data-c]:not(.on) { opacity: 0.18; }
+  .card.editing .zc { cursor: crosshair; }
+
+  @media (prefers-reduced-motion: reduce) { .zc, .arrow, .head, .dot { transition: none; } }
+  @media (max-width: 640px) {
+    .card { border-radius: 12px; }
+    .zoom { right: 8px; bottom: 8px; }
+    .left { left: 8px; bottom: 8px; }
+    .btn { width: 32px; height: 32px; }
+    .menu { left: 48px; bottom: 8px; }
+    .timeline { padding: 4px 12px 12px; }
+    .timeline output { min-width: 8em; font-size: 12px; }
+    .pop { left: 8px !important; right: 8px; bottom: 8px; top: auto !important; width: auto; }
+    .info { top: 8px; right: 8px; bottom: 8px; left: 8px; width: auto; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="head-l">
+      <h1>Wars World Map</h1>
+      <p class="showing" id="showing"></p>
+    </div>
+    <div class="head-r">
+      <ul class="legend" aria-label="Legend">
+        <li tabindex="0" data-lg="0"><span class="sw war"></span><span id="lgwar">War</span></li>
+        <li tabindex="0" data-lg="1"><span class="sw spill"></span><span id="lgspill">Spill-over</span></li>
+        <li tabindex="0" data-lg="2" id="lgarrow">
+          <svg width="28" height="12" viewBox="0 0 28 12" aria-hidden="true"><path d="M2 6 H20" class="arrow"/><path d="M26 6 L18 1.8 L18 10.2 Z" class="head"/></svg>
+          <span id="lgarrowtext">Aggressor</span>
+        </li>
+      </ul>
+      <button class="btn lginfo" id="lginfo" type="button" aria-label="What the colours mean" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></button>
+      <div class="lgpop" id="lgpop" role="dialog" aria-label="What the colours mean" hidden></div>
+      <div class="lgtip" id="lgtip" role="tooltip" hidden></div>
+    </div>
+  </header>
+
+  <div class="card" id="card">
+    <div class="stage" id="stage">
+      <svg id="map" role="img" aria-label="World map with current war regions in red"></svg>
+
+      <div class="toolbar" id="toolbar" role="toolbar" aria-label="Draw" hidden>
+        <button class="chip" type="button" data-tool="war" aria-pressed="true"><span class="sw war"></span>War</button>
+        <button class="chip" type="button" data-tool="spill" aria-pressed="false"><span class="sw spill"></span>Spill-over</button>
+        <button class="chip" type="button" data-tool="arrow" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>Arrow</button>
+        <button class="chip" type="button" data-tool="erase" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 21-4.3-4.3a1 1 0 0 1 0-1.4l9.6-9.6a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L11 21M22 21H7M5 11l9 9"/></svg>Erase</button>
+        <button class="chip" type="button" id="undo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>Undo</button>
+        <span class="sep"></span>
+        <input id="mapname" type="text" maxlength="60" placeholder="Name" aria-label="Name of this map" hidden>
+        <button class="chip" type="button" id="delmap" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>Delete</button>
+        <button class="chip" type="button" id="sharemap" aria-pressed="false" title="Everyone who can open this page sees a shared map"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/></svg><span>Share</span></button>
+        <button class="chip" type="button" id="savecopy" hidden>Save as new</button>
+        <button class="chip" type="button" id="cancel" hidden>Cancel</button>
+        <button class="chip done" type="button" id="done">Done</button>
+      </div>
+
+      <div class="col left">
+        <button class="btn" id="bdata" type="button" aria-label="Data" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5z"/><path d="m3 13 9 5 9-5"/></svg></button>
+        <button class="btn" id="bmap" type="button" aria-label="Map type" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg></button>
+        <button class="btn" id="bcentre" type="button" aria-label="Centred on" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+        <button class="btn" id="bdraw" type="button" aria-label="Draw your own map" aria-pressed="false" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.2 6.8a1 1 0 0 0-4-4L3.8 16.2a2 2 0 0 0-.5.8l-1.3 4.4a.5.5 0 0 0 .6.6l4.4-1.3a2 2 0 0 0 .8-.5z"/></svg></button>
+        <button class="btn" id="binfo" type="button" aria-label="About this map" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></button>
+      </div>
+      <div class="menu" id="menu" role="menu" hidden></div>
+
+      <div class="col zoom">
+        <button class="btn" id="zin" type="button" aria-label="Zoom in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M12 5v14"/></svg></button>
+        <button class="btn" id="zout" type="button" aria-label="Zoom out"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg></button>
+        <button class="btn" id="zreset" type="button" aria-label="Back to the start view"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+        <button class="btn" id="zfull" type="button" aria-label="Full screen" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path id="zfullicon" d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg></button>
+      </div>
+
+      <div class="pop" id="pop" role="dialog" aria-live="polite" hidden></div>
+
+      <aside class="info" id="info" aria-label="About this map" hidden>
+        <button class="btn x" type="button" id="infox" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        <h2>About this map</h2>
+        <h3>Sources</h3>
+        <ul>
+          <li><span><b>Uppsala Conflict Data Program (UCDP)</b>, Uppsala University, Sweden. <a href="https://ucdp.uu.se/downloads/" target="_blank" rel="noopener">Georeferenced Event Dataset</a> version 26.1 for 1989 to 2025, and the Candidate Events Dataset up to version 26.0.10 for 2026 (to 5 November). Every event of organised violence with at least one death: state-based conflict, non-state conflict and one-sided violence against civilians. Licence CC BY 4.0.</span></li>
+          <li><span><b>Armed Conflict Location &amp; Event Data (ACLED).</b> <a href="https://acleddata.com/conflict-data/download-data-files" target="_blank" rel="noopener">Aggregated data</a> by week and province, all regions, 2018 to the week of 7 November 2026. Political violence only: battles, explosions and remote violence, and violence against civilians.</span></li>
+          <li><span><b>GDELT Project.</b> <a href="https://www.gdeltproject.org/data.html" target="_blank" rel="noopener">GDELT 1.0 daily event files</a>, coded automatically from news reports worldwide. A sample of two days per month, the 1st and the 15th, from January 2015 to 15 November 2026.</span></li>
+          <li><span><b>Correlates of War Project.</b> <a href="https://correlatesofwar.org/data-sets/mids/" target="_blank" rel="noopener">Militarized Interstate Disputes</a> version 5.0, 1816 to 2014. Threats, displays and uses of force between states.</span></li>
+          <li><span><b>United Nations Secretary-General.</b> <a href="https://childrenandarmedconflict.un.org/sites/default/files/2026-06/A_80_723--S_2026_357-EN.pdf" target="_blank" rel="noopener">Children and armed conflict, A/80/723–S/2026/357</a>, 16 June 2026. The situations in which the UN monitored grave violations against children in 2025.</span></li>
+          <li><span><b>African Union Peace and Security Council.</b> Provisional programme of work for November 2026.</span></li>
+          <li><span><b>Foreign ministries</b> of Brazil, China, Germany, the Netherlands, Russia and the United States. Travel advice as published on their official websites. Only the two highest levels of each scale are shown.</span></li>
+          <li class="mv"><span><b>My view.</b> Drawn by hand by Jorinde Hoek from news reports. Approximate.</span></li>
+        </ul>
+        <h3>Method for the fighting regions</h3>
+        <ul>
+          <li>Each UCDP event is spread over the map as a Gaussian kernel of 60 km, or 110 km when the event is placed only within a province or near a named place.</li>
+          <li>Events placed only within a country, or at sea, are left out.</li>
+          <li>Deaths are UCDP's best estimate, summed per 1,000 km² for each calendar year. Red is 5 deaths or more, light red 0.8 or more. Areas under 3,000 km² are left out. 2026 covers part of the year only.</li>
+          <li>An arrow is drawn when the government of one country is a party to fighting on another country's territory, against that country's government, a group there or civilians, with 25 or more deaths in the year. It runs from the capital to the death-weighted centre of those events. When several governments fight together, each is counted with the full number of deaths.</li>
+        </ul>
+        <h3>Method for political violence (ACLED)</h3>
+        <ul>
+          <li>ACLED's free data gives deaths per province and week, placed at the centre of each province. Each province is spread as a Gaussian kernel of 110 km, with the same thresholds as UCDP: red is 5 deaths or more per 1,000 km², light red 0.8 or more.</li>
+          <li>Protests, riots and strategic developments are left out. There are no arrows, because the aggregated data does not name the sides.</li>
+        </ul>
+        <h3>Method for fighting in the news (GDELT)</h3>
+        <ul>
+          <li>Events with CAMEO root codes 19 (fight) and 20 (mass violence) are kept when they are placed at a town or city and one side is coded as a military, rebel, insurgent, separatist or other armed group.</li>
+          <li>Each place is spread as a Gaussian kernel of 60 km. Density is the share of the year's reports per 1,000 km², so years with more news are comparable with years with less. Red is 2 basis points or more, light red 0.4 or more.</li>
+          <li>An arrow is drawn when a country, its government or its military is reported using force in another country, against that country or an unnamed side, in 30 or more reports and at least 0.2% of all reports of force placed at a town or city that year. Arrows are left out when three-quarters or more of the reports are placed in the target's capital, where news is often filed.</li>
+        </ul>
+        <h3>Method for disputes between states (Correlates of War)</h3>
+        <ul>
+          <li>Countries are coloured by the highest hostility level they reached in any dispute active that year: 5 is war, 4 is use of force. Lower levels (threats and displays of force) are not shown.</li>
+          <li>Arrows run from capital to capital, from the side that took the first militarized action (side A) to the other side, for disputes at level 4 or 5.</li>
+        </ul>
+        <h3>Projections and borders</h3>
+        <ul>
+          <li>The default is an orthographic projection (a globe), centred on the time zone of the viewer's device. No location is sent.</li>
+          <li>Equal Earth and Gall-Peters are equal-area. Mercator keeps shapes and enlarges high latitudes. The polar map is the azimuthal equidistant projection used in the UN emblem.</li>
+          <li>Borders are from Natural Earth (1:50 million), changed to match UN member states: Crimea in Ukraine, Northern Cyprus in Cyprus, Somaliland in Somalia.</li>
+        </ul>
+        <h3>Limits</h3>
+        <ul>
+          <li>Event data rely on media and local reports, so places with little access are undercounted.</li>
+          <li>UCDP candidate events are preliminary and can be revised in the yearly release.</li>
+          <li>ACLED includes violence by armed criminal groups, such as cartels in Mexico. Its free data is per province, so large provinces are shown around their centre.</li>
+          <li>GDELT is coded by machine and is not checked by people. One event can be counted more than once, places can be wrong (news is often placed where it was filed, such as a capital), and news volume follows media attention. The sample of 24 days per year can miss short events.</li>
+          <li>Correlates of War ends in 2014 and covers only conflicts between states, not civil wars.</li>
+          <li>Arrows show where a country's forces fought or were reported to act, not who started a war or whether it was lawful. In Correlates of War, side A took the first militarized action in a dispute, which is not the same as starting a war.</li>
+          <li>Travel advice measures risk to travellers, not the intensity of a conflict, and is mostly issued per country.</li>
+        </ul>
+        <h3 class="mv">My view last updated</h3>
+        <p class="mv" id="infodate"></p>
+        <h3 class="mv">News sources for My view</h3>
+        <ul class="mv" id="sources"></ul>
+      </aside>
+    </div>
+
+    <div class="timeline" id="timeline">
+      <input id="time" type="range" min="0" max="1" step="1" value="1" aria-label="Date shown on the map">
+      <output id="timeout" for="time"></output>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3-geo-projection@4.0.0/dist/d3-geo-projection.min.js"></script>
+<script>
+/* ============================================================
+   THE MAP DATA. Change this block to update the map.
+   periods: [start, end] dates; end null means still going on.
+   changed: date of the latest news that changed this war (gets a dot for 30 days).
+   ============================================================ */
+const AS_OF = "2026-11-21";
+const TIMELINE_START = "2020-01-01";
+
+const CONFLICTS = [
+  { id: "ukraine", name: "Russia's war on Ukraine", periods: [["2022-02-24", null]],
+    state: "Fighting along the front in the east and south. Russian drones and missiles hit cities across Ukraine.",
+    url: "https://en.wikipedia.org/wiki/Russian_invasion_of_Ukraine" },
+  { id: "iran", name: "Iran war", periods: [["2025-06-13", "2025-06-24"], ["2026-02-28", null]],
+    state: "US and Israeli strikes on Iran. Iran fires back at Israel and at US bases in the Gulf.", changed: "2026-11-17",
+    url: "https://en.wikipedia.org/wiki/2026_Iran_war" },
+  { id: "gaza", name: "Gaza war", periods: [["2023-10-07", null]],
+    state: "A ceasefire on paper. Israel announced a new offensive in central Gaza on 18 November.", changed: "2026-11-18",
+    url: "https://en.wikipedia.org/wiki/Gaza_war" },
+  { id: "lebanon", name: "Lebanon war", periods: [["2024-09-23", "2024-11-27"], ["2026-03-02", null]],
+    state: "Temporary ceasefire since 16 April, but Israeli airstrikes continue.",
+    url: "https://en.wikipedia.org/wiki/2026_Lebanon_war" },
+  { id: "yemen", name: "Yemen war", periods: [["2014-09-21", null]],
+    state: "The Houthis hold the west of the country. Fighting with Saudi Arabia is escalating again.", changed: "2026-11-21",
+    url: "https://en.wikipedia.org/wiki/Yemeni_civil_war_(2014%E2%80%93present)" },
+  { id: "sudan", name: "Sudan war", periods: [["2023-04-15", null]],
+    state: "The army against the Rapid Support Forces. Heavy fighting in Darfur and Kordofan, and famine.",
+    url: "https://en.wikipedia.org/wiki/Sudanese_civil_war_(2023%E2%80%93present)" },
+  { id: "congo", name: "Eastern Congo war", periods: [["2022-03-28", null]],
+    state: "M23 rebels, backed by Rwanda, hold Goma and Bukavu.",
+    url: "https://en.wikipedia.org/wiki/M23_campaign_(2022%E2%80%93present)" },
+  { id: "sahel", name: "Sahel war", periods: [["2012-01-17", null]],
+    state: "Jihadist groups fight the military governments of Mali, Burkina Faso and Niger.",
+    url: "https://en.wikipedia.org/wiki/Mali_War" },
+  { id: "bokoharam", name: "Boko Haram", periods: [["2009-07-26", null]],
+    state: "Jihadist attacks around Lake Chad, in Nigeria, Niger, Chad and Cameroon.",
+    url: "https://en.wikipedia.org/wiki/Boko_Haram_insurgency" },
+  { id: "myanmar", name: "Myanmar civil war", periods: [["2021-02-01", null]],
+    state: "Rebel armies and the resistance fight the military government across the country.",
+    url: "https://en.wikipedia.org/wiki/Myanmar_civil_war_(2021%E2%80%93present)" },
+  { id: "somalia", name: "Somalia war", periods: [["2009-01-31", null]],
+    state: "The government and African Union troops fight al-Shabaab in the south.",
+    url: "https://en.wikipedia.org/wiki/Somali_civil_war_(2009%E2%80%93present)" },
+  { id: "amhara", name: "Amhara conflict", periods: [["2023-08-01", null]],
+    state: "Fano militias fight the Ethiopian army in the Amhara region.",
+    url: "https://en.wikipedia.org/wiki/War_in_Amhara" },
+  { id: "afpak", name: "Pakistan and Afghanistan", periods: [["2025-10-11", null]],
+    state: "Border clashes between Pakistan and the Taliban, and insurgency on both sides.",
+    url: "https://en.wikipedia.org/wiki/List_of_ongoing_armed_conflicts" },
+  { id: "haiti", name: "Haiti gang war", periods: [["2021-07-07", null]],
+    state: "Armed gangs control most of Port-au-Prince.",
+    url: "https://en.wikipedia.org/wiki/List_of_ongoing_armed_conflicts" },
+];
+
+// level "war": red core with a light red halo; level "spill": light red only.
+// Shape: country, gaza: true, or area: [[lon, lat], ...]
+const ZONES = [
+  { c: "ukraine", name: "Front line", level: "war", area: [[36.0,50.4],[38.3,50.1],[40.1,49.6],[40.0,48.3],[39.6,47.7],[38.3,47.1],[36.8,46.6],[35.3,46.3],[33.6,46.1],[32.6,46.5],[33.6,46.9],[35.0,47.5],[36.2,48.2],[36.6,49.0],[35.9,49.7]] },
+  { c: "ukraine", name: "Strikes across Ukraine", level: "spill", country: "Ukraine" },
+  { c: "ukraine", name: "Kursk and Belgorod border", level: "spill", periods: [["2024-08-06", null]], area: [[34.0,52.3],[36.5,51.9],[38.6,51.1],[40.2,50.2],[40.1,49.5],[38.3,50.0],[36.0,50.3],[34.2,51.3]] },
+  { c: "iran", name: "Iran", level: "war", country: "Iran" },
+  { c: "iran", name: "Kuwait", level: "spill", country: "Kuwait" },
+  { c: "iran", name: "Qatar", level: "spill", country: "Qatar" },
+  { c: "iran", name: "Bahrain", level: "spill", country: "Bahrain" },
+  { c: "iran", name: "United Arab Emirates", level: "spill", country: "United Arab Emirates" },
+  { c: "gaza", name: "Gaza", level: "war", gaza: true },
+  { c: "gaza", name: "West Bank", level: "spill", country: "Palestine" },
+  { c: "lebanon", name: "South Lebanon and Bekaa", level: "war", area: [[35.1,33.07],[35.6,33.07],[35.85,33.35],[36.25,33.7],[36.55,34.15],[36.3,34.35],[35.95,34.05],[35.55,33.85],[35.25,33.5]] },
+  { c: "yemen", name: "Houthi front", level: "war", area: [[42.6,16.8],[43.3,17.4],[44.5,17.4],[45.5,17.0],[46.0,16.0],[45.6,15.0],[45.0,14.0],[44.5,13.3],[43.5,12.7],[43.2,13.3],[42.8,14.8],[42.7,15.7]] },
+  { c: "sudan", name: "Darfur, Kordofan, Khartoum", level: "war", area: [[22.0,15.5],[24.0,16.0],[27.0,16.0],[30.0,16.2],[32.5,16.2],[33.5,15.0],[33.5,13.0],[32.0,11.5],[30.0,10.0],[27.5,9.6],[25.0,10.0],[23.5,10.5],[22.4,11.5],[21.9,13.0]] },
+  { c: "congo", name: "Kivu and Ituri", level: "war", area: [[29.0,3.0],[30.8,2.4],[31.2,1.8],[30.0,0.6],[29.8,-1.4],[29.2,-1.7],[29.2,-2.8],[29.0,-4.4],[28.6,-4.5],[28.0,-3.5],[27.5,-2.5],[27.6,-1.0],[28.0,0.5],[28.2,2.0]] },
+  { c: "sahel", name: "Mali, Burkina Faso, western Niger", level: "war", area: [[-6.0,15.0],[-4.0,17.5],[-1.0,19.0],[1.0,20.0],[3.5,19.5],[4.5,17.0],[3.5,15.5],[2.5,14.0],[2.5,12.5],[1.5,11.5],[0.0,11.0],[-2.5,9.8],[-4.5,10.0],[-5.0,11.5],[-5.5,13.5]] },
+  { c: "bokoharam", name: "Lake Chad", level: "spill", area: [[11.5,13.5],[13.8,13.9],[14.6,13.2],[14.5,11.5],[13.5,10.5],[12.0,11.0],[11.0,12.0]] },
+  { c: "myanmar", name: "Myanmar", level: "war", country: "Myanmar" },
+  { c: "somalia", name: "South and central Somalia", level: "war", area: [[41.0,-1.5],[42.0,-0.5],[45.5,2.0],[47.5,4.5],[48.5,5.5],[47.5,6.5],[46.0,5.5],[44.0,4.5],[42.5,4.0],[41.0,3.5],[41.0,1.0]] },
+  { c: "amhara", name: "Amhara", level: "spill", area: [[36.5,10.5],[37.5,13.0],[39.5,13.0],[40.0,11.5],[39.5,10.0],[38.0,9.8],[36.8,10.0]] },
+  { c: "afpak", name: "Border region", level: "spill", area: [[69.0,31.0],[70.5,34.5],[71.5,36.0],[72.5,35.5],[72.0,34.0],[71.0,32.0],[70.0,30.0],[66.5,29.0],[65.0,28.5],[64.0,29.5],[66.5,30.5]] },
+  { c: "haiti", name: "Port-au-Prince and Artibonite", level: "spill", area: [[-73.0,18.3],[-71.9,18.3],[-71.8,19.4],[-72.8,19.4]] },
+];
+
+// close: only shows once you zoom in far enough
+const ARROWS = [
+  { c: "ukraine", label: "Russia attacks Ukraine", from: [40.5, 53.6], to: [37.6, 48.9] },
+  { c: "iran", label: "Israel attacks Iran", from: [35.3, 31.4], to: [52.5, 31.0], bend: -0.3 },
+  { c: "iran", label: "The United States attacks Iran", periods: [["2025-06-22", "2025-06-22"], ["2026-02-28", null]], from: [-78, 38.5], to: [53.5, 34.0], bend: 0.14 },
+  { c: "congo", label: "Rwanda backs the M23 rebels in Congo", from: [30.1, -1.9], to: [28.5, -1.3] },
+  { c: "gaza", label: "Israel attacks Gaza", periods: [["2023-10-08", null]], from: [34.95, 31.05], to: [34.42, 31.42], close: true },
+  { c: "lebanon", label: "Israel attacks Lebanon", from: [35.25, 32.7], to: [35.6, 33.25], close: true },
+];
+
+// Map types. The globe comes first: it has no distortion and no edge, so nothing is pushed to the side.
+const MAPS = [
+  { id: "globe", label: "Globe" },
+  { id: "equalearth", label: "Equal Earth", make: () => d3.geoEqualEarth() },
+  { id: "naturalearth", label: "Natural Earth", make: () => d3.geoNaturalEarth1() },
+  { id: "robinson", label: "Robinson", make: () => d3.geoRobinson() },
+  { id: "mercator", label: "Mercator", make: () => d3.geoMercator() },
+  { id: "gallpeters", label: "Gall-Peters", make: () => d3.geoCylindricalEqualArea().parallel(45) },
+  { id: "polar", label: "Polar (UN emblem)", polar: true, make: () => d3.geoAzimuthalEquidistant().clipAngle(150) },
+];
+// Where your region is, from the device's time zone. Nothing is sent anywhere.
+const TZ = {"Europe/Andorra":[1,42],"Asia/Dubai":[55,25],"Asia/Kabul":[69,34],"America/Antigua":[-61,17],"America/Anguilla":[-63,18],"Europe/Tirane":[19,41],"Asia/Yerevan":[44,40],"Africa/Luanda":[13,-8],"Antarctica/McMurdo":[166,-77],"Antarctica/Casey":[110,-66],"Antarctica/Davis":[77,-68],"Antarctica/DumontDUrville":[140,-66],"Antarctica/Mawson":[62,-67],"Antarctica/Palmer":[-64,-64],"Antarctica/Rothera":[-68,-67],"Antarctica/Syowa":[2,-69],"Antarctica/Troll":[1,-72],"Antarctica/Vostok":[106,-78],"America/Argentina/Buenos_Aires":[-58,-34],"America/Argentina/Cordoba":[-64,-31],"America/Argentina/Salta":[-65,-24],"America/Argentina/Jujuy":[-65,-24],"America/Argentina/Tucuman":[-65,-26],"America/Argentina/Catamarca":[-65,-28],"America/Argentina/La_Rioja":[-66,-29],"America/Argentina/San_Juan":[-68,-31],"America/Argentina/Mendoza":[-68,-32],"America/Argentina/San_Luis":[-66,-33],"America/Argentina/Rio_Gallegos":[-69,-51],"America/Argentina/Ushuaia":[-68,-54],"Pacific/Pago_Pago":[-170,-14],"Europe/Vienna":[16,48],"Australia/Lord_Howe":[159,-31],"Antarctica/Macquarie":[158,-54],"Australia/Hobart":[147,-42],"Australia/Melbourne":[144,-37],"Australia/Sydney":[151,-33],"Australia/Broken_Hill":[141,-31],"Australia/Brisbane":[153,-27],"Australia/Lindeman":[149,-20],"Australia/Adelaide":[138,-34],"Australia/Darwin":[130,-12],"Australia/Perth":[115,-31],"Australia/Eucla":[128,-31],"America/Aruba":[-69,12],"Europe/Mariehamn":[19,60],"Asia/Baku":[49,40],"Europe/Sarajevo":[18,43],"America/Barbados":[-59,13],"Asia/Dhaka":[90,23],"Europe/Brussels":[4,50],"Africa/Ouagadougou":[-1,12],"Europe/Sofia":[23,42],"Asia/Bahrain":[50,26],"Africa/Bujumbura":[29,-3],"Africa/Porto-Novo":[2,6],"America/St_Barthelemy":[-62,17],"Atlantic/Bermuda":[-64,32],"Asia/Brunei":[114,4],"America/La_Paz":[-68,-16],"America/Kralendijk":[4,12],"America/Noronha":[-32,-3],"America/Belem":[-48,-1],"America/Fortaleza":[-38,-3],"America/Recife":[-34,-8],"America/Araguaina":[-48,-7],"America/Maceio":[-35,-9],"America/Bahia":[-38,-12],"America/Sao_Paulo":[-46,-23],"America/Campo_Grande":[-54,-20],"America/Cuiaba":[-56,-15],"America/Santarem":[-54,-2],"America/Porto_Velho":[-63,-8],"America/Boa_Vista":[-60,2],"America/Manaus":[-60,-3],"America/Eirunepe":[-69,-6],"America/Rio_Branco":[-67,-9],"America/Nassau":[-77,25],"Asia/Thimphu":[89,27],"Africa/Gaborone":[25,-24],"Europe/Minsk":[27,53],"America/Belize":[-88,17],"America/St_Johns":[-52,47],"America/Halifax":[-63,44],"America/Glace_Bay":[-59,46],"America/Moncton":[-64,46],"America/Goose_Bay":[-60,53],"America/Blanc-Sablon":[-57,51],"America/Toronto":[-79,43],"America/Iqaluit":[-68,63],"America/Atikokan":[2,48],"America/Winnipeg":[-97,49],"America/Resolute":[5,74],"America/Rankin_Inlet":[1,62],"America/Regina":[-104,50],"America/Swift_Current":[-107,50],"America/Edmonton":[-113,53],"America/Cambridge_Bay":[0,69],"America/Inuvik":[9,68],"America/Vancouver":[-123,49],"America/Creston":[-116,49],"America/Dawson_Creek":[-120,55],"America/Fort_Nelson":[-122,58],"America/Whitehorse":[-135,60],"America/Dawson":[-139,64],"Indian/Cocos":[96,-12],"Africa/Kinshasa":[15,-4],"Africa/Lubumbashi":[27,-11],"Africa/Bangui":[18,4],"Africa/Brazzaville":[15,-4],"Europe/Zurich":[8,47],"Africa/Abidjan":[-4,5],"Pacific/Rarotonga":[-159,-21],"America/Santiago":[-70,-33],"America/Coyhaique":[-72,-45],"America/Punta_Arenas":[-70,-53],"Pacific/Easter":[-109,-27],"Africa/Douala":[9,4],"Asia/Shanghai":[121,31],"Asia/Urumqi":[87,43],"America/Bogota":[-74,4],"America/Costa_Rica":[-84,9],"America/Havana":[-82,23],"Atlantic/Cape_Verde":[-23,14],"America/Curacao":[-69,12],"Indian/Christmas":[105,-10],"Asia/Nicosia":[33,35],"Asia/Famagusta":[33,35],"Europe/Prague":[14,50],"Europe/Berlin":[13,52],"Europe/Busingen":[8,47],"Africa/Djibouti":[43,11],"Europe/Copenhagen":[12,55],"America/Dominica":[-61,15],"America/Santo_Domingo":[-69,18],"Africa/Algiers":[3,36],"America/Guayaquil":[-79,-2],"Pacific/Galapagos":[-89,0],"Europe/Tallinn":[24,59],"Africa/Cairo":[31,30],"Africa/El_Aaiun":[-13,27],"Africa/Asmara":[38,15],"Europe/Madrid":[-3,40],"Africa/Ceuta":[-5,35],"Atlantic/Canary":[-15,28],"Africa/Addis_Ababa":[38,9],"Europe/Helsinki":[24,60],"Pacific/Fiji":[178,-18],"Atlantic/Stanley":[-57,-51],"Pacific/Chuuk":[151,7],"Pacific/Pohnpei":[158,6],"Pacific/Kosrae":[162,5],"Atlantic/Faroe":[-6,62],"Europe/Paris":[2,48],"Africa/Libreville":[9,0],"Europe/London":[0,51],"America/Grenada":[-61,12],"Asia/Tbilisi":[44,41],"America/Cayenne":[-52,4],"Europe/Guernsey":[7,49],"Africa/Accra":[0,5],"Europe/Gibraltar":[-5,36],"America/Nuuk":[-51,64],"America/Danmarkshavn":[-18,76],"America/Scoresbysund":[-21,70],"America/Thule":[-68,76],"Africa/Banjul":[-16,13],"Africa/Conakry":[-13,9],"America/Guadeloupe":[-61,16],"Africa/Malabo":[8,3],"Europe/Athens":[23,37],"Atlantic/South_Georgia":[-36,-54],"America/Guatemala":[-90,14],"Pacific/Guam":[144,13],"Africa/Bissau":[-15,11],"America/Guyana":[-58,6],"Asia/Hong_Kong":[114,22],"America/Tegucigalpa":[-87,14],"Europe/Zagreb":[15,45],"America/Port-au-Prince":[-72,18],"Europe/Budapest":[19,47],"Asia/Jakarta":[106,-6],"Asia/Pontianak":[109,0],"Asia/Makassar":[119,-5],"Asia/Jayapura":[140,-2],"Europe/Dublin":[-6,53],"Asia/Jerusalem":[0,31],"Europe/Isle_of_Man":[-4,54],"Asia/Kolkata":[88,22],"Indian/Chagos":[72,-7],"Asia/Baghdad":[44,33],"Asia/Tehran":[51,35],"Atlantic/Reykjavik":[-21,64],"Europe/Rome":[12,41],"Europe/Jersey":[1,49],"America/Jamaica":[6,17],"Asia/Amman":[35,31],"Asia/Tokyo":[6,35],"Africa/Nairobi":[36,-1],"Asia/Bishkek":[74,42],"Asia/Phnom_Penh":[104,11],"Pacific/Tarawa":[173,1],"Pacific/Kanton":[-171,-2],"Pacific/Kiritimati":[-157,1],"Indian/Comoro":[43,-11],"America/St_Kitts":[-62,17],"Asia/Pyongyang":[125,39],"Asia/Seoul":[126,37],"Asia/Kuwait":[47,29],"America/Cayman":[-81,19],"Asia/Almaty":[76,43],"Asia/Qyzylorda":[65,44],"Asia/Qostanay":[63,53],"Asia/Aqtobe":[57,50],"Asia/Aqtau":[50,44],"Asia/Atyrau":[51,47],"Asia/Oral":[51,51],"Asia/Vientiane":[102,17],"Asia/Beirut":[35,33],"America/St_Lucia":[-61,14],"Europe/Vaduz":[9,47],"Asia/Colombo":[79,6],"Africa/Monrovia":[-10,6],"Africa/Maseru":[27,-29],"Europe/Vilnius":[25,54],"Europe/Luxembourg":[6,49],"Europe/Riga":[24,56],"Africa/Tripoli":[13,32],"Africa/Casablanca":[-7,33],"Europe/Monaco":[7,43],"Europe/Chisinau":[28,47],"Europe/Podgorica":[19,42],"America/Marigot":[-63,18],"Indian/Antananarivo":[47,-18],"Pacific/Majuro":[171,7],"Pacific/Kwajalein":[167,9],"Europe/Skopje":[21,41],"Africa/Bamako":[-8,12],"Asia/Yangon":[96,16],"Asia/Ulaanbaatar":[106,47],"Asia/Hovd":[91,48],"Asia/Macau":[0,22],"Pacific/Saipan":[145,15],"America/Martinique":[-61,14],"Africa/Nouakchott":[-15,18],"America/Montserrat":[-62,16],"Europe/Malta":[14,35],"Indian/Mauritius":[57,-20],"Indian/Maldives":[73,4],"Africa/Blantyre":[35,-15],"America/Mexico_City":[-99,19],"America/Cancun":[-86,21],"America/Merida":[-89,20],"America/Monterrey":[-100,25],"America/Matamoros":[-97,25],"America/Chihuahua":[-106,28],"America/Ciudad_Juarez":[-106,31],"America/Ojinaga":[-104,29],"America/Mazatlan":[-106,23],"America/Bahia_Banderas":[-105,20],"America/Hermosillo":[-110,29],"America/Tijuana":[-117,32],"Asia/Kuala_Lumpur":[101,3],"Asia/Kuching":[110,1],"Africa/Maputo":[32,-25],"Africa/Windhoek":[17,-22],"Pacific/Noumea":[166,-22],"Africa/Niamey":[2,13],"Pacific/Norfolk":[167,-29],"Africa/Lagos":[3,6],"America/Managua":[-86,12],"Europe/Amsterdam":[4,52],"Europe/Oslo":[10,59],"Asia/Kathmandu":[85,27],"Pacific/Nauru":[166,0],"Pacific/Niue":[-169,-19],"Pacific/Auckland":[174,-36],"Pacific/Chatham":[-176,-43],"Asia/Muscat":[58,23],"America/Panama":[-79,8],"America/Lima":[-77,-12],"Pacific/Tahiti":[-149,-17],"Pacific/Marquesas":[-139,-9],"Pacific/Gambier":[-134,-23],"Pacific/Port_Moresby":[147,-9],"Pacific/Bougainville":[155,-6],"Asia/Manila":[2,14],"Asia/Karachi":[67,24],"Europe/Warsaw":[21,52],"America/Miquelon":[-56,47],"Pacific/Pitcairn":[-130,-25],"America/Puerto_Rico":[7,18],"Asia/Gaza":[34,31],"Asia/Hebron":[0,31],"Europe/Lisbon":[-9,38],"Atlantic/Madeira":[-16,32],"Atlantic/Azores":[-25,37],"Pacific/Palau":[134,7],"America/Asuncion":[-57,-25],"Asia/Qatar":[51,25],"Indian/Reunion":[55,-20],"Europe/Bucharest":[26,44],"Europe/Belgrade":[20,44],"Europe/Kaliningrad":[20,54],"Europe/Moscow":[1,55],"Europe/Simferopol":[34,44],"Europe/Kirov":[49,58],"Europe/Volgograd":[44,48],"Europe/Astrakhan":[48,46],"Europe/Saratov":[46,51],"Europe/Ulyanovsk":[48,54],"Europe/Samara":[50,53],"Asia/Yekaterinburg":[60,56],"Asia/Omsk":[73,55],"Asia/Novosibirsk":[82,55],"Asia/Barnaul":[83,53],"Asia/Tomsk":[84,56],"Asia/Novokuznetsk":[87,53],"Asia/Krasnoyarsk":[92,56],"Asia/Irkutsk":[104,52],"Asia/Chita":[113,52],"Asia/Yakutsk":[129,62],"Asia/Khandyga":[3,62],"Asia/Vladivostok":[131,43],"Asia/Ust-Nera":[7,64],"Asia/Magadan":[150,59],"Asia/Sakhalin":[142,46],"Asia/Srednekolymsk":[153,67],"Asia/Kamchatka":[158,53],"Asia/Anadyr":[177,64],"Africa/Kigali":[30,-1],"Asia/Riyadh":[46,24],"Pacific/Guadalcanal":[160,-9],"Indian/Mahe":[55,-4],"Africa/Khartoum":[32,15],"Europe/Stockholm":[18,59],"Asia/Singapore":[103,1],"Atlantic/St_Helena":[-5,-15],"Europe/Ljubljana":[14,46],"Arctic/Longyearbyen":[16,78],"Europe/Bratislava":[17,48],"Africa/Freetown":[-13,8],"Europe/San_Marino":[12,43],"Africa/Dakar":[-17,14],"Africa/Mogadishu":[45,2],"America/Paramaribo":[-55,5],"Africa/Juba":[31,4],"Africa/Sao_Tome":[6,0],"America/El_Salvador":[-89,13],"America/Lower_Princes":[6,18],"Asia/Damascus":[36,33],"Africa/Mbabane":[31,-26],"America/Grand_Turk":[-71,21],"Africa/Ndjamena":[15,12],"Indian/Kerguelen":[1,-49],"Africa/Lome":[1,6],"Asia/Bangkok":[100,13],"Asia/Dushanbe":[68,38],"Pacific/Fakaofo":[-171,-9],"Asia/Dili":[125,-8],"Asia/Ashgabat":[58,37],"Africa/Tunis":[10,36],"Pacific/Tongatapu":[1,-21],"Europe/Istanbul":[28,41],"America/Port_of_Spain":[-61,10],"Pacific/Funafuti":[179,-8],"Asia/Taipei":[121,25],"Africa/Dar_es_Salaam":[39,-6],"Europe/Kyiv":[30,50],"Africa/Kampala":[32,0],"Pacific/Midway":[-177,28],"Pacific/Wake":[166,19],"America/New_York":[2,40],"America/Detroit":[4,42],"America/Kentucky/Louisville":[6,38],"America/Kentucky/Monticello":[8,36],"America/Indiana/Indianapolis":[7,39],"America/Indiana/Vincennes":[9,38],"America/Indiana/Winamac":[6,41],"America/Indiana/Marengo":[3,38],"America/Indiana/Petersburg":[2,38],"America/Indiana/Vevay":[3,38],"America/Chicago":[1,41],"America/Indiana/Tell_City":[2,37],"America/Indiana/Knox":[6,41],"America/Menominee":[9,45],"America/North_Dakota/Center":[9,47],"America/North_Dakota/New_Salem":[2,46],"America/North_Dakota/Beulah":[1,47],"America/Denver":[1,39],"America/Boise":[9,43],"America/Phoenix":[4,33],"America/Los_Angeles":[8,34],"America/Anchorage":[5,61],"America/Juneau":[7,58],"America/Sitka":[5,57],"America/Metlakatla":[7,55],"America/Yakutat":[9,59],"America/Nome":[5,64],"America/Adak":[9,51],"Pacific/Honolulu":[5,21],"America/Montevideo":[3,-34],"Asia/Samarkand":[66,39],"Asia/Tashkent":[69,41],"Europe/Vatican":[8,41],"America/St_Vincent":[-61,13],"America/Caracas":[-66,10],"America/Tortola":[-64,18],"America/St_Thomas":[-64,18],"Asia/Ho_Chi_Minh":[106,10],"Pacific/Efate":[168,-17],"Pacific/Wallis":[-176,-13],"Pacific/Apia":[-171,-13],"Asia/Aden":[45,12],"Indian/Mayotte":[45,-12],"Africa/Johannesburg":[28,-26],"Africa/Lusaka":[28,-15],"Africa/Harare":[31,-17]};
+const TZ_OLD = { "Asia/Calcutta": "Asia/Kolkata", "Asia/Katmandu": "Asia/Kathmandu", "Asia/Saigon": "Asia/Ho_Chi_Minh", "Asia/Rangoon": "Asia/Yangon",
+  "Europe/Kiev": "Europe/Kyiv", "America/Buenos_Aires": "America/Argentina/Buenos_Aires", "Asia/Dacca": "Asia/Dhaka", "Asia/Ulan_Bator": "Asia/Ulaanbaatar",
+  "Atlantic/Faeroe": "Atlantic/Faroe", "America/Indianapolis": "America/Indiana/Indianapolis", "Pacific/Truk": "Pacific/Chuuk", "Asia/Istanbul": "Europe/Istanbul" };
+const TZ_AREA = { Europe: [15, 50], Africa: [20, 5], America: [-80, 15], Asia: [90, 30], Australia: [135, -25], Pacific: [170, -10], Atlantic: [-30, 30], Indian: [75, -10] };
+function homeLonLat() {
+  let z = ""; try { z = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch {}
+  return TZ[z] || TZ[TZ_OLD[z]] || TZ_AREA[z.split("/")[0]] || [15, 20];
+}
+const HOME = homeLonLat();
+// What sits in the middle of the map. No choice is neutral, so the default is wherever you are.
+const CENTRES = [
+  { id: "you", label: "Your region", lon: HOME[0], lat: HOME[1] },
+  { id: "afreu", label: "Africa and Europe", lon: 15, lat: 15 },
+  { id: "asiapac", label: "Asia and the Pacific", lon: 120, lat: 15 },
+  { id: "americas", label: "The Americas", lon: -80, lat: 10 },
+];
+let centreId = "you", southUp = false;
+const centre = () => CENTRES.find(c => c.id === centreId);
+const centreLon = () => centre().lon;
+const globeStart = () => [-centre().lon, -Math.max(-50, Math.min(50, centre().lat))];   // globe rotation: looking at the centre
+/* ============================================================ */
+
+const W = 1000, H = 500;
+const CORE_BLUR = 1.4, HALO_BLUR = 4, HALO = 12;
+const DAY = 86400000;
+const byId = new Map(CONFLICTS.map(c => [c.id, c]));
+const zoneKey = z => z.c + "|" + (z.country || z.name);
+const arrowKey = a => a.c + "|" + a.label;
+const fmt = iso => new Date(iso + "T12:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+const activeAt = (periods, d) => periods.some(([s, e]) => s <= d && (!e || d <= e));
+const zonePeriods = z => z.periods || byId.get(z.c).periods;
+const arrowPeriods = a => a.periods || byId.get(a.c).periods;
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function sinceText(periods) {
+  return periods.map(([s, e], i) => {
+    if (!e) return (i ? "and since " : "Since ") + fmt(s);
+    if (s === e) return (i ? "and on " : "On ") + fmt(s);
+    return (i ? "and from " : "From ") + fmt(s) + " to " + fmt(e);
+  }).join(", ");
+}
+
+function ring(coords) {
+  const poly = { type: "Polygon", coordinates: [[...coords, coords[0]]] };
+  if (d3.geoArea(poly) > 2 * Math.PI) poly.coordinates[0].reverse();
+  return poly;
+}
+
+/* ---------- state ---------- */
+const svg = d3.select("#map");
+const card = document.getElementById("card");
+let transform = d3.zoomIdentity, viewBox = [0, 0, W, H], mapId = "globe";
+let rot = globeStart(), gk = 1, sphere, land110 = null, borders110 = null, settleTimer = 0;
+const isGlobe = () => mapId === "globe";
+const zk = () => isGlobe() ? gk : transform.k;
+let proj, path, land, byName, bordersGeo, zoneGeom = new Map(), countryWars = new Map();
+let world, landLayer, haloLayer, coreLayer, userHaloLayer, userCoreLayer, borderPath, overlay, coreBlur, haloBlur, zoom;
+let date = AS_OF, focusId = null;
+let mine = { strokes: [], arrows: [], hidden: [] };
+let editing = false, tool = "war", undoStack = [], db = null;
+let source = "ucdp", storeReady = false, me = null, userApi = null, maps = [], names = {};
+let draft = null;   // a new map being drawn: { base }; saved maps are edited in place
+const srcData = {};
+// Owner first, then when they last changed it, then what it is. Research first, then groups of countries, then single governments, then drawn by hand.
+// the public copy (outside Claude) leaves out the hand-drawn view
+const PUBLIC = true;
+const SOURCES = [
+  { id: "ucdp", group: "Research", owner: "Uppsala University, Sweden", label: "Fighting data (UCDP)", updated: "2026-11-06", kind: "zones", legend: ["Heavy fighting", "Fighting", "Fighting abroad"], years: [1989, 2026], partial: true },
+  { id: "acled", group: "Research", owner: "ACLED, United States", label: "Political violence data", updated: "2026-11-07", kind: "zones", legend: ["Heavy fighting", "Fighting"], years: [2018, 2026], partial: true },
+  { id: "gdelt", group: "Research", owner: "GDELT Project", label: "Fighting in the news", updated: "2026-11-15", kind: "zones", legend: ["Many reports of fighting", "Some reports of fighting", "Fighting abroad, as reported"], years: [2015, 2026], partial: true },
+  { id: "cow", group: "Research", owner: "Correlates of War, United States", label: "Disputes between states", updated: "2020-11-03", kind: "advice", legend: ["War", "Use of force", "From the side that acted first"], years: [1816, 2014] },
+  { id: "un", group: "International", owner: "United Nations", label: "Armed conflict situations", updated: "2026-06-16", kind: "advice", legend: ["On the Security Council agenda", "Other situations in the report"], file: "un-situations.json" },
+  { id: "au", group: "International", owner: "African Union", label: "Peace and Security Council agenda", updated: "2026-11-01", kind: "advice", legend: ["Main conflicts on the agenda", "Also on the agenda"], file: "au-advice.json" },
+  { id: "br", group: "Governments", owner: "Brazil", label: "Consular alerts", updated: "2026-07-04", kind: "advice", legend: ["Do not travel", "Avoid non-essential travel"], file: "br-advice.json" },
+  { id: "cn", group: "Governments", owner: "China", label: "Safety reminders", updated: "2026-09-14", kind: "advice", legend: ["Do not go", "Be careful or avoid"], file: "cn-advice.json" },
+  { id: "de", group: "Governments", owner: "Germany", label: "Travel and safety advice", updated: "2026-11-20", kind: "advice", legend: ["Travel warning", "Partial travel warning"], file: "de-advice.json" },
+  { id: "nl", group: "Governments", owner: "Netherlands", label: "Travel advice", updated: "2026-11-19", kind: "advice", legend: ["Red: do not travel", "Partly red or orange"], file: "nl-advice.json" },
+  { id: "ru", group: "Governments", owner: "Russia", label: "Foreign ministry warnings", updated: "2026-11-11", kind: "advice", legend: ["Refrain from travel", "Risk of arrest at US request"], file: "ru-advice.json" },
+  { id: "us", group: "Governments", owner: "United States", label: "Travel advisories", updated: "2026-10-22", kind: "advice", legend: ["Level 4: do not travel", "Level 3: reconsider travel"], file: "us-advice.json" },
+  { id: "mine", group: "Drawn by hand", owner: "Jorinde Hoek", label: "My view, from the news", updated: AS_OF, kind: "drawn", legend: ["War", "Spill-over", "Aggressor"] },
+];
+if (PUBLIC) { SOURCES.splice(SOURCES.findIndex(x => x.id === "mine"), 1); document.documentElement.classList.add("public"); }
+const DRAWN_LEGEND = ["War", "Spill-over", "Aggressor"];
+// sources with one file per year: the slider moves through the years
+const yearOf = {}, yearCache = new Map();
+const yearsOf = id => SOURCES.find(x => x.id === id)?.years;
+const curYear = id => yearOf[id] ?? yearsOf(id)[1];
+const yearLabel = (id, y) => y === yearsOf(id)[1] && SOURCES.find(x => x.id === id).partial ? y + " so far" : String(y);
+function loadYear(id, y) {
+  const k = id + "/" + y;
+  if (!yearCache.has(k)) yearCache.set(k, fetch(k + ".json").then(r => r.json()).catch(e => { yearCache.delete(k); throw e; }));
+  return yearCache.get(k);
+}
+async function showYear(id, y) {
+  yearOf[id] = y;
+  let data; try { data = await loadYear(id, y); } catch (e) { console.warn("Could not load", id, y, e); return; }
+  if (yearOf[id] !== y) return;   // the slider moved on while this year was loading
+  srcData[id] = data;
+  if (source === id) { closePop(); drawZones(); drawOverlay(); updateShowing(); }
+  const [f, l] = yearsOf(id);
+  for (const n of [y - 1, y + 1]) if (n >= f && n <= l) loadYear(id, n).catch(() => {});
+}
+
+// the calendar day where the viewer is, not in London
+const localDay = iso => { if (!iso) return ""; const d = new Date(iso), p = n => String(n).padStart(2, "0"); return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); };
+const savedMap = id => maps.find(m => "map:" + m.id === id);
+function srcInfo(id) {
+  const s = SOURCES.find(x => x.id === id); if (s) return s;
+  const m = savedMap(id);
+  if (m) return { id, group: "Drawn by hand", owner: names[m.by] || "Someone", label: m.name || "Untitled map", updated: localDay(m.updated || m.created), kind: "drawn", legend: DRAWN_LEGEND, map: m };
+  return { id: "draft", kind: "drawn", legend: DRAWN_LEGEND };
+}
+const srcKind = () => srcInfo(source).kind;
+// the base under a hand-drawn map: My view's own regions, or nothing
+const baseIsMine = () => source === "mine" || (draft ? draft.base === "mine" : srcInfo(source).map?.base === "mine");
+
+/* ---------- geometry ---------- */
+function buildGeometry() {
+  for (const z of ZONES) {
+    let g;
+    if (z.area) g = ring(z.area);
+    else if (z.gaza) {
+      const pg = byName.get("Palestine").geometry;
+      const polys = pg.type === "MultiPolygon" ? pg.coordinates : [pg.coordinates];
+      g = polys.map(p => ({ type: "Polygon", coordinates: p })).sort((a, b) => d3.geoArea(a) - d3.geoArea(b))[0];
+    } else g = byName.get(z.country)?.geometry;
+    if (g) zoneGeom.set(zoneKey(z), g);
+  }
+  // which wars touch which country
+  const add = (name, id) => { if (!countryWars.has(name)) countryWars.set(name, new Set()); countryWars.get(name).add(id); };
+  const boxes = new Map(land.map(f => [f, d3.geoBounds(f)]));
+  const inBox = (f, [lon, lat]) => { const [[a, b], [c, d]] = boxes.get(f); return lat >= b && lat <= d && (a > c || (lon >= a && lon <= c)); };
+  const contains = (f, p) => inBox(f, p) && d3.geoContains(f, p);
+  for (const z of ZONES) {
+    const g = zoneGeom.get(zoneKey(z)); if (!g) continue;
+    if (z.country) { add(z.country, z.c); continue; }
+    if (z.gaza) { add("Palestine", z.c); continue; }
+    const pts = z.area.concat([d3.geoCentroid(g)]);
+    for (const f of land) {
+      if (pts.some(p => contains(f, p)) || d3.geoContains(g, d3.geoCentroid(f))) add(f.properties.name, z.c);
+    }
+  }
+  for (const a of ARROWS) for (const f of land) if (contains(f, a.from)) add(f.properties.name, a.c);
+}
+
+/* ---------- drawing ---------- */
+function setProjection() {
+  const angle = southUp ? 180 : 0;
+  if (isGlobe()) proj = d3.geoOrthographic().rotate(rot).angle(angle).translate([W / 2, H / 2]).scale((H / 2 - 8) * gk).clipAngle(90);
+  else {
+    const m = MAPS.find(m => m.id === mapId);
+    proj = m.make().rotate([-centreLon(), m.polar ? -90 : 0]).angle(angle).fitExtent([[8, 8], [W - 8, H - 8]], { type: "FeatureCollection", features: land });
+  }
+  path = d3.geoPath(proj);
+  if (isGlobe()) viewCentre = proj.invert([W / 2, H / 2]);
+}
+// on the globe, points on the far side are hidden
+let viewCentre = [0, 0];
+function visible(p) { return !isGlobe() || d3.geoDistance(p, viewCentre) < Math.PI / 2 - 0.02; }
+
+// lite: the simpler world outline, used while the globe is turning
+function drawBase(lite) {
+  const L = lite && land110 ? land110 : land, B = lite && land110 ? borders110 : bordersGeo;
+  sphere.attr("d", path({ type: "Sphere" }));   // the sea: one colour, so the land stands out
+  const ds = L.map(f => path(f));
+  svg.select("#landclip").selectAll("path").data(ds).join("path").attr("d", d => d);
+  landLayer.selectAll("path").data(L).join("path").attr("class", "land").attr("d", (f, i) => ds[i]);
+  borderPath.attr("d", path(B));
+}
+
+function drawZones() {
+  hoverId = null;   // removed shapes never send a pointer-out
+  haloLayer.selectAll("*").remove();
+  coreLayer.selectAll("*").remove();
+  const kind = srcKind();
+  if (kind !== "drawn") { userHaloLayer.selectAll("*").remove(); userCoreLayer.selectAll("*").remove(); }
+  if (kind === "advice") return drawAdvice();
+  if (kind === "zones") return drawUcdp();
+  const hidden = new Set(mine.hidden), at = baseDate();
+  for (const z of baseIsMine() ? ZONES : []) {
+    const k = zoneKey(z), g = zoneGeom.get(k);
+    if (!g || hidden.has(k) || !activeAt(zonePeriods(z), at)) continue;
+    const d = path(g);
+    if (z.level === "war") {
+      haloLayer.append("path").attr("class", "z-halo zc").attr("data-c", z.c).attr("data-k", k).attr("stroke-width", HALO * zs()).attr("d", d);
+      coreLayer.append("path").attr("class", "z-war zc").attr("data-c", z.c).attr("data-k", k).attr("d", d);
+    } else {
+      haloLayer.append("path").attr("class", "z-spill zc").attr("data-c", z.c).attr("data-k", k).attr("d", d);
+    }
+  }
+  drawUser();
+  applyFocus();
+}
+
+function drawAdvice() {
+  const data = srcData[source]; if (!data) return;
+  const put = (level, id, d) => (level === "war" ? coreLayer : haloLayer).append("path")
+    .attr("class", level === "war" ? "z-war zc" : "z-spill zc").attr("data-nl", id).attr("d", d);
+  for (const f of land) {
+    const a = data.countries[f.id];
+    if (!a) continue;
+    if (a.level) put(a.level, f.id, path(f));
+    // a named region inside the country is red, drawn with the same shapes as my view
+    if (a.zone) for (const z of ZONES) if (z.c === a.zone && z.level === "war" && zoneGeom.get(zoneKey(z))) put("war", f.id, path(zoneGeom.get(zoneKey(z))));
+  }
+  const g = data.countries.gaza, gz = ZONES.find(z => z.gaza);
+  if (g && gz && zoneGeom.get(zoneKey(gz))) put(g.level, "gaza", path(zoneGeom.get(zoneKey(gz))));
+}
+
+// a saved map keeps My view as it was on the day it was saved
+function baseDate() {
+  if (source === "mine") return date;
+  const m = srcInfo(source).map;
+  return m && m.created ? localDay(m.created) : AS_OF;
+}
+
+function drawUcdp() {
+  const data = srcData[source]; if (!data?.zones) return;
+  data.zones.forEach((z, i) => {
+    const d = path({ type: "Polygon", coordinates: z.g });
+    if (!d) return;
+    if (z.level === "war") {
+      haloLayer.append("path").attr("class", "z-halo zc").attr("data-u", i).attr("stroke-width", HALO * zs()).attr("d", d);
+      coreLayer.append("path").attr("class", "z-war zc").attr("data-u", i).attr("d", d);
+    } else {
+      haloLayer.append("path").attr("class", "z-spill zc").attr("data-u", i).attr("d", d);
+    }
+  });
+}
+
+// A stroke is as wide as a stretch of earth (wd, in degrees), so it covers the same ground at every zoom and on every map.
+const unitsPerDeg = () => proj.scale() * Math.PI / 180;
+const zs = () => isGlobe() ? gk : 1;   // on the globe, zoom changes the projection itself
+const strokeW = s => (s.wd != null ? s.wd : (s.w || 16) / 2.8) * unitsPerDeg();
+function drawUser() {
+  userHaloLayer.selectAll("*").remove();
+  userCoreLayer.selectAll("*").remove();
+  for (const s of mine.strokes) {
+    if (s.pts.length < 1) continue;
+    const g = s.pts.length === 1 ? { type: "LineString", coordinates: [s.pts[0], s.pts[0]] } : { type: "LineString", coordinates: s.pts };
+    const d = path(g);
+    if (s.level === "war") {
+      userHaloLayer.append("path").attr("class", "u-halo").attr("stroke-width", strokeW(s) + HALO * zs()).attr("d", d);
+      userCoreLayer.append("path").attr("class", "u-war").attr("stroke-width", strokeW(s)).attr("d", d);
+    } else {
+      userHaloLayer.append("path").attr("class", "u-spill").attr("stroke-width", strokeW(s)).attr("d", d);
+    }
+  }
+}
+
+function pxPerUnit() {
+  const m = svg.node().getScreenCTM();
+  return m ? m.a : (svg.node().clientWidth || viewBox[2]) / viewBox[2];
+}
+
+function drawOverlay() {
+  overlay.selectAll("*").remove();
+  const kind = srcKind();
+  if (kind !== "drawn" && !srcData[source]?.arrows) return;
+  const ppu = pxPerUnit();
+  const head = 10 / ppu, minLen = 30 / ppu, sw = 1.6 / ppu;
+  const hidden = new Set(mine.hidden);
+  if (kind !== "drawn") {
+    for (const [i, a] of (srcData[source]?.arrows || []).entries()) {
+      const d = { ...a, key: source + "|" + i, ucdp: true, own: false, bend: 0.2 };
+      if (!visible(d.to)) continue;
+      isGlobe() ? globeArrow(d, head, sw, ppu) : flatArrow(d, head, minLen, sw, ppu);
+    }
+    return applyFocus();
+  }
+  const list = (baseIsMine() ? ARROWS : []).filter(a => !hidden.has(arrowKey(a)) && activeAt(arrowPeriods(a), baseDate()) && (!a.close || zk() >= 4) && visible(a.to))
+    .map(a => ({ ...a, key: arrowKey(a), own: false }))
+    .concat(mine.arrows.map((a, i) => ({ ...a, key: "mine|" + i, own: true, idx: i })));
+  for (const a of list) isGlobe() ? globeArrow(a, head, sw, ppu) : flatArrow(a, head, minLen, sw, ppu);
+  // dots for what changed in the last 30 days, only when looking at today
+  if (source === "mine" && date === AS_OF && !editing) {
+    for (const c of CONFLICTS) {
+      if (!c.changed || (Date.parse(AS_OF) - Date.parse(c.changed)) / DAY > 30) continue;
+      const z = ZONES.find(z => z.c === c.id && z.level === "war" && !hidden.has(zoneKey(z)));
+      if (!z) continue;
+      const cen = d3.geoCentroid(zoneGeom.get(zoneKey(z)));
+      if (!visible(cen)) continue;
+      const [x, y] = transform.apply(proj(cen));
+      overlay.append("circle").attr("class", "dot").attr("data-c", c.id).attr("cx", x).attr("cy", y)
+        .attr("r", 4.5 / ppu).attr("stroke-width", 2.5 / ppu)
+        .on("click", ev => { ev.stopPropagation(); openConflict(c.id, ev, true); })
+        .on("pointerenter", ev => { if (ev.pointerType === "mouse") hover(c.id); })
+        .on("pointerleave", () => hover(null))
+        .append("title").text("Changed " + fmt(c.changed));
+    }
+  }
+  applyFocus();
+}
+
+function flatArrow(a, head, minLen, sw, ppu) {
+  let [x1, y1] = transform.apply(proj(a.from)), [x2, y2] = transform.apply(proj(a.to));
+  let dx = x2 - x1, dy = y2 - y1, len = Math.hypot(dx, dy) || 1;
+  if (len < minLen) { x1 = x2 - dx / len * minLen; y1 = y2 - dy / len * minLen; dx = x2 - x1; dy = y2 - y1; len = minLen; }
+  const ux = dx / len, uy = dy / len, bend = a.bend ?? (a.own ? 0.22 : 0);   // your own arrows curve by themselves
+  const cx = (x1 + x2) / 2 + uy * len * bend, cy = (y1 + y2) / 2 - ux * len * bend;
+  let tx = x2 - cx, ty = y2 - cy; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+  const ex = x2 - tx * head * 0.8, ey = y2 - ty * head * 0.8, w = head * 0.55;
+  const curve = `M${x1},${y1} Q${cx},${cy} ${ex},${ey}`;
+  const g = overlay.append("g");
+  if (a.c) g.attr("data-c", a.c);
+  g.append("path").attr("class", "arrow").attr("stroke-width", sw).attr("d", curve);
+  g.append("path").attr("class", "head").attr("d", `M${x2},${y2} L${x2 - tx * head - ty * w},${y2 - ty * head + tx * w} L${x2 - tx * head + ty * w},${y2 - ty * head - tx * w} Z`);
+  g.append("path").attr("class", "hit").attr("stroke-width", 16 / ppu).attr("d", curve)
+    .on("click", ev => { ev.stopPropagation(); onArrow(a, ev); })
+    .on("pointerenter", ev => { if (ev.pointerType === "mouse" && a.c && !editing) hover(a.c); })
+    .on("pointerleave", () => hover(null));
+  }
+
+// on the globe an arrow follows the shortest way over the earth and stops at the horizon
+function globeArrow(a, head, sw, ppu) {
+  if (!a.own && hiddenSet().has(a.key)) return;
+  const at = d3.geoInterpolate(a.from, a.to);
+  const pts = d3.range(0, 1.0001, 1 / 48).map(at).filter(visible).map(p => proj(p));
+  if (pts.length < 2) return;
+  const [x2, y2] = pts[pts.length - 1];
+  let i = pts.length - 2; while (i > 0 && Math.hypot(x2 - pts[i][0], y2 - pts[i][1]) < head) i--;
+  let tx = x2 - pts[i][0], ty = y2 - pts[i][1]; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
+  const w = head * 0.55, line = "M" + pts.slice(0, -1).map(p => p.join(",")).join("L") + `L${x2 - tx * head * 0.8},${y2 - ty * head * 0.8}`;
+  const g = overlay.append("g");
+  if (a.c) g.attr("data-c", a.c);
+  g.append("path").attr("class", "arrow").attr("stroke-width", sw).attr("d", line);
+  g.append("path").attr("class", "head").attr("d", `M${x2},${y2} L${x2 - tx * head - ty * w},${y2 - ty * head + tx * w} L${x2 - tx * head + ty * w},${y2 - ty * head - tx * w} Z`);
+  g.append("path").attr("class", "hit").attr("stroke-width", 16 / ppu).attr("d", line)
+    .on("click", ev => { ev.stopPropagation(); onArrow(a, ev); })
+    .on("pointerenter", ev => { if (ev.pointerType === "mouse" && a.c && !editing) hover(a.c); })
+    .on("pointerleave", () => hover(null));
+}
+const hiddenSet = () => new Set(mine.hidden);
+
+function redrawAll() { drawBase(); drawZones(); drawOverlay(); }
+
+/* ---------- focus and hover ---------- */
+let hoverId = null;
+function hover(id) { hoverId = id; applyFocus(); }
+function applyFocus() {
+  const id = focusId || hoverId;
+  svg.classed("focus", !!id);
+  svg.selectAll("[data-c]").classed("on", function () { return this.getAttribute("data-c") === id; });
+}
+
+/* ---------- click card ---------- */
+const pop = document.getElementById("pop");
+const closeSvg = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>';
+
+function placePop(ev) {
+  pop.hidden = false;
+  const stage = document.getElementById("stage").getBoundingClientRect();
+  const pw = pop.offsetWidth, ph = pop.offsetHeight;
+  let x = (ev?.clientX ?? stage.left + stage.width / 2) - stage.left + 14;
+  let y = (ev?.clientY ?? stage.top + stage.height / 2) - stage.top + 14;
+  if (x + pw > stage.width - 12) x = Math.max(12, x - pw - 28);
+  if (y + ph > stage.height - 12) y = Math.max(12, stage.height - ph - 12);
+  pop.style.left = x + "px"; pop.style.top = y + "px";
+}
+
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+function showPop(build, ev) {
+  pop.replaceChildren();
+  const x = el("button", "btn x"); x.type = "button"; x.setAttribute("aria-label", "Close"); x.innerHTML = closeSvg; x.onclick = closePop;
+  pop.append(x);
+  build(pop);
+  placePop(ev);
+}
+function closePop() { pop.hidden = true; focusId = null; applyFocus(); }
+
+function conflictBody(box, c, extraLine) {
+  box.append(el("h2", null, c.name));
+  if (extraLine) box.append(el("p", null, extraLine));
+  box.append(el("p", "meta", sinceText(c.periods)));
+  if (!activeAt(c.periods, date)) box.append(el("p", "meta", "Not going on at " + fmt(date)));
+  box.append(el("p", null, c.state));
+  const a = el("a", null, "Read more"); a.href = c.url; a.target = "_blank"; a.rel = "noopener"; box.append(a);
+}
+
+function openConflict(id, ev, zoomTo) {
+  const c = byId.get(id); if (!c) return;
+  focusId = id; applyFocus();
+  showPop(box => conflictBody(box, c), ev);
+  if (zoomTo) zoomToConflict(id);
+}
+
+function onArrow(a, ev) {
+  if (editing) { if (tool === "erase") eraseArrow(a); return; }
+  if (a.own) return;
+  if (a.ucdp && a.title) {
+    focusId = null; applyFocus();
+    return showPop(box => {
+      box.append(el("h2", null, a.title));
+      for (const l of a.lines || []) box.append(el("p", null, l));
+      if (a.meta) box.append(el("p", "meta", a.meta));
+      if (a.link) sourceLink(box, "Read more", a.link);
+    }, ev);
+  }
+  if (a.ucdp) {
+    const data = srcData[source];
+    focusId = null; applyFocus();
+    return showPop(box => {
+      const the = n => /^(United|Central African|Netherlands|Philippines|Comoros|Gambia)/.test(n) ? "the " + n : n;
+      box.append(el("h2", null, "Armed forces of " + the(a.actor) + " fighting in " + the(a.place)));
+      box.append(el("p", null, a.deaths.toLocaleString("en-GB") + " deaths in " + a.events.toLocaleString("en-GB") + (a.events === 1 ? " event" : " events")));
+      box.append(el("p", "meta", "Mostly: " + a.dyads.map(ucdpName).join("; ")));
+      box.append(el("p", "meta", "From " + fmt(data.from) + " to " + fmt(data.to)));
+      sourceLink(box, "Read more at UCDP", "https://ucdp.uu.se/");
+    }, ev);
+  }
+  const c = byId.get(a.c);
+  focusId = a.c; applyFocus();
+  showPop(box => { box.append(el("h2", null, a.label)); box.append(el("p", "meta", sinceText(arrowPeriods(a)))); box.append(el("p", null, c.state));
+    const l = el("a", null, "Read more"); l.href = c.url; l.target = "_blank"; l.rel = "noopener"; box.append(l); }, ev);
+}
+
+function openCountry(name, ev) {
+  const ids = [...(countryWars.get(name) || [])].filter(id => activeAt(byId.get(id).periods, date));
+  focusId = null; applyFocus();
+  showPop(box => {
+    box.append(el("h2", null, name));
+    if (!ids.length) { box.append(el("p", "meta", "No war on this map")); return; }
+    box.append(el("p", "meta", ids.length === 1 ? "Touched by" : "Touched by these wars"));
+    const tags = el("div", "tags");
+    for (const id of ids) {
+      const s = el("span"); const sw = el("span", "sw " + (ZONES.some(z => z.c === id && z.level === "war") ? "war" : "spill"));
+      const b = el("button", null, byId.get(id).name); b.type = "button";
+      b.onclick = () => openConflict(id, null, true);
+      s.append(sw, b); tags.append(s);
+    }
+    box.append(tags);
+  }, ev);
+}
+
+function sourceLink(box, text, url) { const a = el("a", null, text); a.href = url; a.target = "_blank"; a.rel = "noopener"; box.append(a); }
+
+function openAdvice(id, name, ev) {
+  const a = srcData[source]?.countries[id];
+  focusId = null; applyFocus();
+  showPop(box => {
+    box.append(el("h2", null, a ? a.name : name));
+    if (!a) { box.append(el("p", "meta", source === "cow" ? "No militarized dispute in " + srcData.cow?.year : "No warning from this source")); return; }
+    if (a.updated) box.append(el("p", "meta", "Changed " + fmt(a.updated)));
+    box.append(el("p", null, a.text.length > 420 ? a.text.slice(0, a.text.lastIndexOf(".", 420) + 1) : a.text));
+    sourceLink(box, source === "au" ? "Read the council agenda" : source === "cow" ? "Read more" : "Read the advice", a.url);
+  }, ev);
+}
+
+const ucdpName = n => n.replace(/ \([^)]*\)/g, "").replace(/XXX\d+/g, "Unidentified group");
+function joinNames(list) { return list.length < 2 ? list.join("") : list.slice(0, -1).join(", ") + " and " + list[list.length - 1]; }
+function openFighting(i, ev) {
+  const data = srcData[source], z = data.zones[i];
+  focusId = null; applyFocus();
+  if (z.title) return showPop(box => {
+    box.append(el("h2", null, z.title));
+    for (const l of z.lines || []) box.append(el("p", null, l));
+    if (z.meta) box.append(el("p", "meta", z.meta));
+  }, ev);
+  showPop(box => {
+    box.append(el("h2", null, z.places.length ? z.places.join(" and ") + ", " + ucdpName(z.countries[0]) : joinNames(z.countries.map(ucdpName))));
+    box.append(el("p", null, z.deaths.toLocaleString("en-GB") + " deaths recorded in this area"));
+    if (z.dyads.length) box.append(el("p", "meta", "Mostly: " + z.dyads.map(ucdpName).join("; ")));
+    box.append(el("p", "meta", "From " + fmt(data.from) + " to " + fmt(data.to)));
+    if (z.cid) sourceLink(box, "Read more at UCDP", "https://ucdp.uu.se/country/" + z.cid);
+  }, ev);
+}
+
+async function setSource(id) {
+  const s = srcInfo(id);
+  if (s.years && !srcData[id]) await showYear(id, curYear(id));
+  if (s.file && !srcData[id]) {
+    try {
+      srcData[id] = await fetch(s.file).then(r => r.json());
+    } catch (e) { console.warn("Could not load", s.file, e); return; }
+  }
+  if (editing) setEditing(false);
+  source = id;
+  if (s.map) mine = parseEdits(s.map); else if (id === "mine") mine = { strokes: [], arrows: [], hidden: [] };
+  if (s.map?.view) applyView(s.map.view);
+  closePop();
+  document.getElementById("lgwar").textContent = s.legend[0];
+  document.getElementById("lgspill").textContent = s.legend[1];
+  document.getElementById("lgarrow").hidden = !s.legend[2];
+  document.getElementById("lgarrowtext").textContent = s.legend[2] || "";
+  setTimeMode(id === "mine" ? "days" : s.years ? "years" : null);
+  if (!lgpop.hidden) buildLegendPop();
+  drawZones(); drawOverlay(); updateShowing();
+}
+
+/* ---------- zoom ---------- */
+// pinch on a touchpad arrives as a wheel event with ctrlKey; a mouse wheel moves in big whole steps
+function isZoomWheel(ev) {
+  if (ev.ctrlKey) return true;
+  if (ev.deltaMode !== 0) return true;
+  return ev.deltaX === 0 && Number.isInteger(ev.deltaY) && Math.abs(ev.deltaY) >= 50;
+}
+
+function zoomToConflict(id) {
+  const feats = ZONES.filter(z => z.c === id && z.level === "war").map(z => zoneGeom.get(zoneKey(z))).filter(Boolean);
+  const geoms = feats.length ? feats : ZONES.filter(z => z.c === id).map(z => zoneGeom.get(zoneKey(z))).filter(Boolean);
+  if (!geoms.length) return;
+  if (isGlobe()) {
+    const [lon, lat] = d3.geoCentroid({ type: "GeometryCollection", geometries: geoms });
+    return turnGlobe([-lon, -lat], Math.max(gk, 2));
+  }
+  const [[x0, y0], [x1, y1]] = path.bounds({ type: "GeometryCollection", geometries: geoms });
+  const [vx, vy, vw, vh] = viewBox;
+  const k = Math.max(1, Math.min(8, 0.45 / Math.max((x1 - x0) / vw, (y1 - y0) / vh)));
+  const t = d3.zoomIdentity.translate(vx + vw / 2, vy + vh / 2).scale(k).translate(-(x0 + x1) / 2, -(y0 + y1) / 2);
+  (reduceMotion ? svg : svg.transition().duration(600)).call(zoom.transform, t);
+}
+
+function setViewBox() {
+  const narrow = matchMedia("(max-width: 640px)").matches && !card.classList.contains("full");
+  const vb = narrow ? [200, 0, 600, 500] : [0, 0, W, H];
+  const changed = vb.join() !== viewBox.join() || !svg.attr("viewBox");
+  viewBox = vb;
+  svg.attr("viewBox", vb.join(" ")).style("aspect-ratio", `${vb[2]} / ${vb[3]}`);
+  zoom?.scaleExtent([vb[2] / W, 24]);
+  return changed;
+}
+
+/* ---------- timeline ---------- */
+const range = document.getElementById("time"), out = document.getElementById("timeout");
+const t0 = Date.parse(TIMELINE_START + "T12:00:00Z"), t1 = Date.parse(AS_OF + "T12:00:00Z");
+range.max = Math.round((t1 - t0) / DAY); range.value = range.max;
+function setDate() {
+  const d = new Date(t0 + Number(range.value) * DAY).toISOString().slice(0, 10);
+  date = d;
+  out.textContent = d === AS_OF ? "Today, " + fmt(d) : fmt(d);
+  out.classList.toggle("past", d !== AS_OF);
+  if (proj) { drawZones(); drawOverlay(); if (!pop.hidden && focusId) openConflict(focusId, null, false); }
+}
+let timeMode = "days";
+function setTimeMode(mode) {
+  document.getElementById("timeline").hidden = !mode;
+  if (!mode) return;
+  timeMode = mode;
+  if (mode === "days") { range.max = Math.round((t1 - t0) / DAY); range.value = Math.round((Date.parse(date + "T12:00:00Z") - t0) / DAY); setDate(); }
+  else { const [f, l] = yearsOf(source); range.max = l - f; range.value = curYear(source) - f; setYear(); }
+  range.setAttribute("aria-label", mode === "days" ? "Date shown on the map" : "Year shown on the map");
+}
+function setYear() {
+  const [f, l] = yearsOf(source), y = f + Number(range.value);
+  out.textContent = yearLabel(source, y);
+  out.classList.toggle("past", y !== l);
+  if (y !== curYear(source) || !srcData[source]) showYear(source, y);
+}
+range.addEventListener("input", () => timeMode === "days" ? setDate() : setYear());
+setDate();
+
+/* ---------- info panel ---------- */
+const info = document.getElementById("info"), binfo = document.getElementById("binfo");
+document.getElementById("infodate").textContent = fmt(AS_OF);
+const srcList = document.getElementById("sources");
+for (const c of CONFLICTS) { const li = el("li"); const a = el("a", null, c.name); a.href = c.url; a.target = "_blank"; a.rel = "noopener"; li.append(a); srcList.append(li); }
+function toggleInfo(open) { info.hidden = !open; binfo.setAttribute("aria-pressed", String(open)); if (open) closePop(); }
+binfo.onclick = () => toggleInfo(info.hidden);
+document.getElementById("infox").onclick = () => toggleInfo(false);
+
+/* ---------- menus: map type, centre, data ---------- */
+const menu = document.getElementById("menu");
+const bmap = document.getElementById("bmap"), bcentre = document.getElementById("bcentre"), bdata = document.getElementById("bdata");
+let menuOwner = null;
+const short = iso => {
+  if (!iso) return "";
+  const d = new Date(iso + "T12:00:00Z"), same = d.getUTCFullYear() === new Date().getFullYear();
+  return d.toLocaleDateString("en-GB", same ? { day: "numeric", month: "short", timeZone: "UTC" } : { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+};
+function closeMenu() {
+  menu.hidden = true;
+  for (const b of [bmap, bcentre, bdata, bdraw]) b.setAttribute("aria-expanded", "false");
+  menuOwner = null;
+}
+function menuItem(label, on, act, role = "menuitemradio") {
+  const b = el("button"); b.type = "button"; b.setAttribute("role", role); b.setAttribute("aria-checked", String(on));
+  if (typeof label === "string") b.append(el("span", null, label)); else label(b);
+  b.onclick = () => { closeMenu(); act(); };
+  menu.append(b);
+}
+function sourceItem(s) {
+  menuItem(b => {
+    b.className = "src";
+    const own = el("span", "own", s.owner);
+    if (s.map && !s.map.shared) own.insertAdjacentHTML("beforeend", '<svg class="lock" viewBox="0 0 24 24" aria-label="Only you"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>');
+    b.append(own, el("span", "when", short(s.updated)), el("span", "name", s.label));
+  }, s.id === source, () => setSource(s.id));
+}
+const builders = {
+  map() {
+    for (const m of MAPS) menuItem(m.label, m.id === mapId, () => setMap(m.id));
+  },
+  centre() {
+    for (const c of CENTRES) menuItem(c.label, c.id === centreId, () => setCentre(c.id));
+    menu.append(el("hr"));
+    menuItem("South at the top", southUp, () => { southUp = !southUp; setMap(mapId, true); }, "menuitemcheckbox");
+  },
+  data() {
+    const own = [SOURCES.find(x => x.id === "mine")].concat(maps.slice().sort((a, b) => (b.updated || "").localeCompare(a.updated || "")).map(m => srcInfo("map:" + m.id))).filter(Boolean);
+    const rest = SOURCES.filter(x => x.id !== "mine");
+    if (own.length) { menu.append(el("div", "group", "Drawn by hand")); own.forEach(sourceItem); }
+    let group = null;
+    for (const s of rest) {
+      if (s.group !== group) { group = s.group; menu.append(el("div", "group soft", group)); }
+      sourceItem(s);
+    }
+  },
+  draw() {
+    menuItem("Start empty", false, () => startDraft("empty"), "menuitem");
+    menuItem("Start from My view", false, () => startDraft("mine"), "menuitem");
+  },
+};
+function openMenu(kind, btn) {
+  if (menuOwner === kind) return closeMenu();
+  closeMenu(); closePop(); hideTip();
+  menu.replaceChildren(); builders[kind]();
+  menu.classList.toggle("wide", kind === "data");
+  menu.hidden = false; menuOwner = kind;
+  btn.setAttribute("aria-expanded", "true");
+  (menu.querySelector('[aria-checked="true"]') || menu.querySelector("button")).focus();
+}
+bmap.onclick = () => openMenu("map", bmap);
+bcentre.onclick = () => openMenu("centre", bcentre);
+bdata.onclick = () => openMenu("data", bdata);
+document.addEventListener("pointerdown", ev => { if (!menu.hidden && !menu.contains(ev.target) && !ev.target.closest(".left")) closeMenu(); });
+/* ---------- hover labels on every round button ---------- */
+const stageEl = document.getElementById("stage");
+const tip = el("div", "tip"); tip.hidden = true; tip.setAttribute("aria-hidden", "true"); stageEl.append(tip);
+let tipTimer = 0;
+function hideTip() { clearTimeout(tipTimer); tip.hidden = true; }
+function showTip(btn) {
+  if (btn.getAttribute("aria-expanded") === "true") return;
+  tip.textContent = btn.getAttribute("aria-label");
+  tip.hidden = false;
+  const st = stageEl.getBoundingClientRect(), r = btn.getBoundingClientRect(), right = r.left - st.left > st.width / 2;
+  tip.style.top = (r.top - st.top + r.height / 2 - tip.offsetHeight / 2) + "px";
+  tip.style.left = right ? "auto" : (r.right - st.left + 8) + "px";
+  tip.style.right = right ? (st.right - r.left + 8) + "px" : "auto";
+}
+stageEl.querySelectorAll(".col .btn").forEach(b => {
+  b.addEventListener("pointerenter", ev => { if (ev.pointerType !== "mouse") return; clearTimeout(tipTimer); tipTimer = setTimeout(() => showTip(b), 200); });
+  b.addEventListener("pointerleave", hideTip);
+  b.addEventListener("pointerdown", hideTip);
+  b.addEventListener("focus", () => { if (b.matches(":focus-visible")) showTip(b); });
+  b.addEventListener("blur", hideTip);
+});
+
+/* ---------- what the colours mean ---------- */
+const DEFS = {
+  ucdp: ["5 or more recorded deaths per 1,000 km² in the year shown.", "0.8 to 5 recorded deaths per 1,000 km² in the year shown.",
+    "A country's armed forces fighting on another country's territory, with 25 or more deaths in the year. Drawn from its capital to where the deaths were."],
+  acled: ["5 or more reported deaths per 1,000 km² in the year shown, from battles, explosions and violence against civilians.", "0.8 to 5 reported deaths per 1,000 km² in the year shown."],
+  gdelt: ["Many news reports of fighting per area in the year shown, compared with the rest of the world that year.", "Some news reports of fighting per area in the year shown.",
+    "News reports of one country's armed forces fighting in another country. Drawn from its capital to where the reports place the fighting."],
+  cow: ["The state took part in a war with another state: at least 1,000 battle deaths.", "The state used force against another state, short of war.",
+    "From the side that took the first militarized action to the side it targeted, capital to capital."],
+  un: ["Situation on the agenda of the Security Council, with grave violations against children verified by the UN in 2025.", "Other situation in the same report, not on the Security Council agenda."],
+  au: ["Country situation on the council's programme of work for November 2026.", "Covered under a regional or thematic item of the same programme."],
+  br: ["Consular alert advising against all travel.", "Consular alert advising against non-essential travel, or travel to part of the country."],
+  cn: ["Safety reminder not to go to the country.", "Safety reminder to take extra care, or to avoid part of the country."],
+  de: ["Reisewarnung: warning against all travel to the country.", "Teilreisewarnung: warning against travel to part of the country."],
+  nl: ["Red for the whole country: do not travel.", "Red for part of the country, or orange: only necessary travel."],
+  ru: ["Ministry of Foreign Affairs recommends refraining from travel.", "Warning that Russian citizens risk arrest at the request of the United States."],
+  us: ["Level 4 of 4 of the State Department scale.", "Level 3 of 4 of the State Department scale."],
+  drawn: ["Active fighting, drawn by hand.", "Area affected by a nearby war: strikes, border clashes or displacement.", "Points from the side that attacks to the side that is attacked."],
+};
+const lgpop = document.getElementById("lgpop"), lginfo = document.getElementById("lginfo");
+function buildLegendPop() {
+  const s = srcInfo(source), d = DEFS[s.kind === "drawn" ? "drawn" : s.id] || DEFS.drawn;
+  lgpop.replaceChildren();
+  const row = (swatch, label, text) => {
+    const r = el("div", "row"); r.append(swatch, el("b", null, label), el("span", null, text)); lgpop.append(r);
+  };
+  row(el("span", "sw war"), s.legend[0], d[0]);
+  row(el("span", "sw spill"), s.legend[1], d[1]);
+  if (s.legend[2]) {
+    const a = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    a.setAttribute("width", "22"); a.setAttribute("height", "10"); a.setAttribute("viewBox", "0 0 28 12");
+    a.innerHTML = '<path d="M2 6 H20" class="arrow"/><path d="M26 6 L18 1.8 L18 10.2 Z" class="head"/>';
+    row(a, s.legend[2], d[2]);
+  }
+  if (s.owner) lgpop.append(el("p", "src", "Source: " + s.owner + ", " + (s.label || "").replace(/^./, c => c.toLowerCase()) + ". Updated " + short(s.updated) + "."));
+}
+function setLegendPop(open) {
+  if (open) buildLegendPop();
+  lgpop.hidden = !open; lginfo.setAttribute("aria-expanded", String(open));
+}
+// the info button shows everything; one colour in the legend shows only its own meaning
+let lgPinned = false, lgTimer = 0;
+const headR = lginfo.parentElement, lgtip = document.getElementById("lgtip");
+lginfo.onclick = () => { lgPinned = !lgPinned || lgpop.hidden; setLegendPop(lgPinned); hideLgTip(); };
+const popZone = [lginfo, lgpop];
+popZone.forEach(n => {
+  n.addEventListener("pointerenter", ev => { if (ev.pointerType === "mouse") { clearTimeout(lgTimer); hideLgTip(); setLegendPop(true); } });
+  n.addEventListener("pointerleave", ev => { if (ev.pointerType === "mouse" && !lgPinned) lgTimer = setTimeout(() => setLegendPop(false), 150); });
+});
+function legendText(i) {
+  const s = srcInfo(source), d = DEFS[s.kind === "drawn" ? "drawn" : s.id] || DEFS.drawn;
+  return d[i] || "";
+}
+function showLgTip(li) {
+  if (!lgpop.hidden) return;
+  lgtip.textContent = legendText(Number(li.dataset.lg));
+  lgtip.hidden = false;
+  const hr = headR.getBoundingClientRect(), r = li.getBoundingClientRect();
+  const left = Math.min(Math.max(0, r.left - hr.left), Math.max(0, hr.width - lgtip.offsetWidth));
+  lgtip.style.left = left + "px"; lgtip.style.right = "auto";
+  if (hr.left + left + lgtip.offsetWidth > innerWidth - 16) { lgtip.style.left = "auto"; lgtip.style.right = "0"; }
+}
+function hideLgTip() { lgtip.hidden = true; }
+headR.querySelectorAll("[data-lg]").forEach(li => {
+  li.addEventListener("pointerenter", ev => { if (ev.pointerType === "mouse") showLgTip(li); });
+  li.addEventListener("pointerleave", hideLgTip);
+  li.addEventListener("focus", () => showLgTip(li));
+  li.addEventListener("blur", hideLgTip);
+  li.addEventListener("click", ev => {
+    if (ev.pointerType === "mouse") return;
+    const same = !lgtip.hidden && lgtip.textContent === legendText(Number(li.dataset.lg));
+    same ? hideLgTip() : showLgTip(li);
+  });
+});
+document.addEventListener("pointerdown", ev => {
+  if (!lgpop.hidden && !headR.contains(ev.target)) { lgPinned = false; setLegendPop(false); }
+  if (!lgtip.hidden && !ev.target.closest?.("[data-lg]")) hideLgTip();
+});
+
+/* ---------- one line saying what is on screen ---------- */
+const tzCity = (() => { try { const z = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; return z.includes("/") ? z.split("/").pop().replace(/_/g, " ") : ""; } catch { return ""; } })();
+function updateShowing() {
+  const s = srcInfo(source), m = MAPS.find(x => x.id === mapId);
+  const c = centre(), where = c.id === "you" ? (tzCity ? "your region (" + tzCity + ")" : "your region") : c.label;
+  const box = document.getElementById("showing"); box.replaceChildren();
+  const b = t => el("b", null, t);
+  box.append("Showing ", b(isGlobe() ? "a globe" : m.label), " centred on ", b(where), southUp ? ", south at the top, with " : ", with ");
+  if (source === "draft") box.append(b("a new drawing"), ".");
+  else if (s.kind === "drawn") box.append(b(s.label), " drawn by " + s.owner + ".");
+  else if (s.years) box.append(b(s.label.replace(" (UCDP)", "").replace(/^./, ch => ch.toLowerCase()) + " for " + yearLabel(source, curYear(source))), " from " + s.owner + ".");
+  else box.append(b(s.label.replace(/^./, ch => ch.toLowerCase())), " from " + s.owner + ".");
+}
+
+function setCentre(id) {
+  centreId = id; updateShowing();
+  if (isGlobe()) turnGlobe(globeStart(), gk); else setMap(mapId, true);
+}
+function setMap(id, keepGlobe) {
+  mapId = id; closePop();
+  if (isGlobe() && !keepGlobe) { rot = globeStart(); gk = 1; }
+  svg.call(zoom.transform, d3.zoomIdentity);
+  setProjection(); redrawAll(); updateShowing();
+}
+
+/* ---------- full screen ---------- */
+const bfull = document.getElementById("zfull");
+function setFull(on) {
+  card.classList.toggle("full", on);
+  bfull.setAttribute("aria-pressed", String(on));
+  bfull.setAttribute("aria-label", on ? "Leave full screen" : "Full screen");
+  document.getElementById("zfullicon").setAttribute("d", on ? "M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" : "M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7");
+  hideTip();
+  if (on) card.requestFullscreen?.().catch(() => {});
+  else if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+  if (setViewBox()) svg.call(zoom.transform, d3.zoomIdentity);
+  requestAnimationFrame(drawOverlay);
+}
+bfull.onclick = () => setFull(!card.classList.contains("full"));
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && card.classList.contains("full")) setFull(false); });
+
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  if (!lgpop.hidden) { lgPinned = false; setLegendPop(false); return; }
+  if (!menu.hidden) { const o = { map: bmap, centre: bcentre, data: bdata, draw: bdraw }[menuOwner]; closeMenu(); o?.focus(); }
+  else if (!pop.hidden) closePop();
+  else if (!info.hidden) toggleInfo(false);
+  else if (editing) setEditing(false);
+  else if (card.classList.contains("full")) setFull(false);
+});
+
+/* ---------- drawing your own ---------- */
+const toolbar = document.getElementById("toolbar"), bdraw = document.getElementById("bdraw");
+const nameIn = document.getElementById("mapname"), bdone = document.getElementById("done");
+const bcancel = document.getElementById("cancel"), bdel = document.getElementById("delmap");
+const bshare = document.getElementById("sharemap"), bcopy = document.getElementById("savecopy");
+let draftFrom = "mine";
+function setShareChip(on) { bshare.setAttribute("aria-pressed", String(on)); bshare.lastChild.textContent = on ? "Shared" : "Share"; }
+function setEditing(on) {
+  editing = on;
+  card.classList.toggle("editing", on);
+  toolbar.hidden = !on;
+  bdraw.setAttribute("aria-pressed", String(on));
+  const m = srcInfo(source).map;
+  nameIn.hidden = !on || (!draft && !m);
+  if (on) nameIn.value = draft ? "" : (m?.name || "");
+  bcancel.hidden = !draft; bdel.hidden = !m; bcopy.hidden = !m;
+  bshare.hidden = !me || (!draft && !m);
+  setShareChip(draft ? !!draft.shared : !!m?.shared);
+  bdone.textContent = draft ? "Save" : "Done";
+  undoStack = [];
+  closePop(); closeMenu(); toggleInfo(false);
+  drawOverlay();
+}
+// a new map: empty, or on top of My view as it is today
+function startDraft(base) {
+  draftFrom = source;
+  draft = { base, shared: false };
+  source = "draft"; mine = { strokes: [], arrows: [], hidden: [] };
+  document.getElementById("lgwar").textContent = DRAWN_LEGEND[0];
+  document.getElementById("lgspill").textContent = DRAWN_LEGEND[1];
+  document.getElementById("lgarrow").hidden = false;
+  document.getElementById("lgarrowtext").textContent = DRAWN_LEGEND[2];
+  document.getElementById("timeline").hidden = true;
+  setEditing(true);
+  drawZones(); drawOverlay(); updateShowing();
+}
+// where a map lives: shared maps in "maps", your own in your private space
+const docRef = m => m.shared || !me ? db.collection("maps").doc(m.id) : db.collection("data/users/" + me).doc("map-" + m.id);
+const mapData = m => { const { id, ...data } = m; return data; };
+// the view is saved with the map: map type, centre, rotation and zoom
+function getView() {
+  return { map: mapId, centre: centreId, southUp, rot: rot.map(v => Math.round(v * 100) / 100), gk: Math.round(gk * 100) / 100,
+    t: [Math.round(transform.x * 10) / 10, Math.round(transform.y * 10) / 10, Math.round(transform.k * 1000) / 1000] };
+}
+function applyView(v) {
+  if (!v || !MAPS.some(m => m.id === v.map)) return;
+  mapId = v.map; centreId = CENTRES.some(c => c.id === v.centre) ? v.centre : centreId; southUp = !!v.southUp;
+  if (isGlobe()) { rot = Array.isArray(v.rot) ? v.rot.slice(0, 2) : globeStart(); gk = clampK(v.gk || 1); }
+  svg.call(zoom.transform, isGlobe() || !v.t ? d3.zoomIdentity : d3.zoomIdentity.translate(v.t[0], v.t[1]).scale(v.t[2]));
+  setProjection(); redrawAll(); if (isGlobe()) globeRedraw();
+}
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+async function createMap(fields) {
+  const now = new Date().toISOString();
+  const m = { id: newId(), by: me || "", created: now, updated: now, strokes: JSON.stringify(mine.strokes), arrows: JSON.stringify(mine.arrows),
+    hidden: mine.hidden.slice(), view: getView(), ...fields };
+  await docRef(m).set(mapData(m));
+  if (!maps.some(x => x.id === m.id)) maps.push(m);
+  return m;
+}
+bdraw.onclick = () => {
+  if (editing) return bdone.click();
+  if (srcInfo(source).map) return setEditing(true);
+  openMenu("draw", bdraw);
+};
+bdone.onclick = async () => {
+  if (!draft) { dirty = true; setEditing(false); flush(); return; }
+  if (!db) return;
+  let m;
+  try { m = await createMap({ name: nameIn.value.trim() || "My war map", base: draft.base, shared: !!draft.shared && !!me }); }
+  catch (e) { console.warn("Could not save map", e); return; }
+  draft = null; setEditing(false);
+  setSource("map:" + m.id);
+};
+// a second version of the same map, under its own name
+bcopy.onclick = async () => {
+  const cur = srcInfo(source).map; if (!cur || !db) return;
+  let name = nameIn.value.trim() || cur.name || "My war map";
+  if (name === cur.name) name += " (2)";
+  let m;
+  try { m = await createMap({ name, base: cur.base, shared: false }); }
+  catch (e) { console.warn("Could not save copy", e); return; }
+  setEditing(false); setSource("map:" + m.id); setEditing(true);
+};
+// share or unshare: the map moves between your private space and the shared list
+bshare.onclick = async () => {
+  if (draft) { draft.shared = !draft.shared; setShareChip(draft.shared); return; }
+  const m = srcInfo(source).map; if (!m || !db || !me) return;
+  const old = { ...m };
+  m.shared = !m.shared; m.updated = new Date().toISOString();
+  m.strokes = JSON.stringify(mine.strokes); m.arrows = JSON.stringify(mine.arrows); m.hidden = mine.hidden.slice();
+  try { await docRef(m).set(mapData(m)); await docRef(old).delete(); setShareChip(m.shared); }
+  catch (e) { m.shared = old.shared; console.warn("Could not change sharing", e); }
+};
+bcancel.onclick = () => { draft = null; setEditing(false); setSource(draftFrom === "draft" ? "ucdp" : draftFrom); };
+bdel.onclick = async () => {
+  const m = srcInfo(source).map; if (!m) return;
+  if (!confirm("Delete the map \u201c" + (m.name || "Untitled map") + "\u201d" + (m.shared ? " for everyone?" : "?"))) return;
+  try { await docRef(m).delete(); } catch (e) { console.warn("Could not delete map", e); return; }
+  maps = maps.filter(x => x !== m);
+  setEditing(false); setSource("ucdp");
+};
+nameIn.addEventListener("input", () => { if (!draft) save(); });
+toolbar.querySelectorAll("[data-tool]").forEach(b => b.onclick = () => {
+  tool = b.dataset.tool;
+  toolbar.querySelectorAll("[data-tool]").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+});
+document.getElementById("undo").onclick = () => {
+  const prev = undoStack.pop(); if (!prev) return;
+  mine = prev; drawUser(); drawZones(); drawOverlay(); save();
+};
+function snapshot() { undoStack.push(JSON.parse(JSON.stringify(mine))); if (undoStack.length > 50) undoStack.shift(); }
+
+const round = p => [Math.round(p[0] * 100) / 100, Math.round(p[1] * 100) / 100];
+function lonlatAt(ev) {
+  const [x, y] = d3.pointer(ev, svg.node());
+  const p = proj.invert(transform.invert([x, y]));
+  return p && isFinite(p[0]) && visible(p) ? round(p) : null;
+}
+
+let drawing = null;
+svg.on("pointerdown.draw", ev => {
+  if (!editing || ev.button > 0 || !ev.isPrimary) return;
+  const p = lonlatAt(ev); if (!p) return;
+  ev.preventDefault();
+  svg.node().setPointerCapture?.(ev.pointerId);
+  if (tool === "war" || tool === "spill") {
+    snapshot();
+    const wd = Math.round((tool === "war" ? 16 : 22) / pxPerUnit() / transform.k / unitsPerDeg() * 1000) / 1000;
+    drawing = { kind: "stroke", s: { level: tool, wd, pts: [p] } };
+    mine.strokes.push(drawing.s); drawUser();
+  } else if (tool === "arrow") {
+    drawing = { kind: "arrow", from: p, to: p };
+  } else if (tool === "erase") {
+    snapshot(); drawing = { kind: "erase", hit: false };
+    eraseAt(ev);
+  }
+});
+svg.on("pointermove.draw", ev => {
+  if (!drawing) return;
+  const p = lonlatAt(ev); if (!p) return;
+  if (drawing.kind === "stroke") {
+    const last = drawing.s.pts[drawing.s.pts.length - 1];
+    if (Math.hypot(p[0] - last[0], p[1] - last[1]) > 0.05 / Math.sqrt(transform.k)) { drawing.s.pts.push(p); drawUser(); }
+  } else if (drawing.kind === "arrow") {
+    drawing.to = p;
+    overlay.selectAll(".preview").remove();
+    const [x1, y1] = transform.apply(proj(drawing.from)), [x2, y2] = transform.apply(proj(p));
+    overlay.append("line").attr("class", "preview").attr("x1", x1).attr("y1", y1).attr("x2", x2).attr("y2", y2)
+      .attr("stroke-width", 1.6 / pxPerUnit()).attr("stroke-dasharray", `${4 / pxPerUnit()} ${4 / pxPerUnit()}`);
+  } else if (drawing.kind === "erase") eraseAt(ev);
+});
+function endDraw() {
+  if (!drawing) return;
+  const d = drawing; drawing = null;
+  if (d.kind === "arrow") {
+    const [x1, y1] = transform.apply(proj(d.from)), [x2, y2] = transform.apply(proj(d.to));
+    if (Math.hypot(x2 - x1, y2 - y1) * pxPerUnit() > 12) { snapshot(); mine.arrows.push({ from: d.from, to: d.to }); save(); }
+    drawOverlay();
+  } else if (d.kind === "stroke") save();
+  else if (d.kind === "erase") { if (d.hit) save(); else undoStack.pop(); }
+}
+svg.on("pointerup.draw pointercancel.draw", endDraw);
+
+function eraseAt(ev) {
+  const p = lonlatAt(ev); if (!p) return;
+  const r = 14 / pxPerUnit() / transform.k;          // eraser radius in map units
+  const [px, py] = proj(p);
+  const before = mine.strokes.length;
+  mine.strokes = mine.strokes.filter(s => !s.pts.some(q => { if (!visible(q)) return false; const [qx, qy] = proj(q); return Math.hypot(qx - px, qy - py) < r + strokeW(s) / 2; }));
+  if (mine.strokes.length !== before) { drawing.hit = true; drawUser(); }
+  // built-in region under the pointer gets hidden
+  const target = document.elementFromPoint(ev.clientX, ev.clientY);
+  const k = target?.getAttribute?.("data-k");
+  if (k && !mine.hidden.includes(k)) { mine.hidden.push(k); drawing.hit = true; drawZones(); drawOverlay(); }
+}
+function eraseArrow(a) {
+  snapshot();
+  if (a.own) mine.arrows.splice(a.idx, 1); else if (!mine.hidden.includes(a.key)) mine.hidden.push(a.key);
+  drawOverlay(); save();
+}
+
+/* ---------- saving: every drawn map is one document in "maps" ---------- */
+let saveTimer = null, saving = false, dirty = false;
+function save() {
+  if (draft || !db || !srcInfo(source).map) return;   // a new map is kept until Save
+  dirty = true;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(flush, 700);
+}
+async function flush() {
+  if (saving || !dirty) return;
+  const m = srcInfo(source).map; if (!m) { dirty = false; return; }
+  saving = true; dirty = false;
+  m.name = nameIn.value.trim() || m.name; m.updated = new Date().toISOString();
+  m.strokes = JSON.stringify(mine.strokes); m.arrows = JSON.stringify(mine.arrows); m.hidden = mine.hidden.slice();
+  m.view = getView();
+  try { await docRef(m).set(mapData(m)); }
+  catch (e) { console.warn("Could not save drawing", e); }
+  saving = false;
+  if (dirty) flush();
+}
+function parseEdits(data) {
+  try {
+    return { strokes: JSON.parse(data.strokes || "[]"), arrows: JSON.parse(data.arrows || "[]"), hidden: Array.isArray(data.hidden) ? data.hidden.slice() : [] };
+  } catch { return { strokes: [], arrows: [], hidden: [] }; }
+}
+const docsOf = snap => (Array.isArray(snap) ? snap : snap?.docs || [])
+  .map(d => ({ ...(typeof d.data === "function" ? d.data() : d.data || {}), id: d.id }));
+async function resolveNames() {
+  const ids = [...new Set(maps.map(m => m.by).filter(Boolean))];
+  if (!userApi || !ids.length) return;
+  try { const ps = await userApi.profiles(ids); for (const id of ids) names[id] = ps?.[id]?.name || "Someone"; }
+  catch (e) { console.warn("No names", e); }
+  if (menuOwner === "data") { menu.replaceChildren(); builders.data(); }
+  if (source.startsWith("map:")) updateShowing();
+}
+async function connectStore() {
+  try {
+    db = await window.claude?.use?.("db");
+    if (!db) return;
+    userApi = await window.claude.use("user");
+    if (userApi) { try { me = await userApi.id(); } catch {} }
+    const may = userApi ? await userApi.can("data.write") : null;
+    storeReady = may !== false;
+    bdraw.hidden = !storeReady;
+    let shared = [], own = [];
+    const merge = () => {
+      maps = own.concat(shared);
+      resolveNames();
+      const cur = source.startsWith("map:") ? savedMap(source) : null;
+      if (source.startsWith("map:") && !cur && !draft && !saving) return;   // may be moving between shared and private
+      if (cur && !editing && !saving && !dirty) { mine = parseEdits(cur); drawZones(); drawOverlay(); }
+    };
+    db.collection("maps").onSnapshot(snap => { shared = docsOf(snap).map(m => ({ ...m, shared: true })); merge(); }, e => console.warn("Maps unavailable", e));
+    if (me) db.collection("data/users/" + me).onSnapshot(snap => {
+      own = docsOf(snap).filter(d => d.id.startsWith("map-")).map(d => ({ ...d, id: d.id.slice(4), shared: false })); merge();
+    }, e => console.warn("Private maps unavailable", e));
+  } catch (e) { console.warn("Drawing store unavailable", e); }
+}
+
+/* ---------- globe: drag to turn, pinch or wheel to zoom ---------- */
+let globeFrame = 0, globeAnim = 0;
+function globeRedraw() {
+  if (globeFrame) return;
+  globeFrame = requestAnimationFrame(() => {
+    globeFrame = 0;
+    haloBlur.attr("stdDeviation", HALO_BLUR * Math.sqrt(gk));
+    coreBlur.attr("stdDeviation", CORE_BLUR);
+    setProjection(); drawBase(true); drawZones(); drawOverlay();
+    // once it stops, swap the simple outline for the detailed one
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => { if (isGlobe() && !globeFrame) drawBase(false); }, 400);
+  });
+}
+const clampK = k => Math.max(1, Math.min(24, k));
+const wrap = a => ((a % 360) + 540) % 360 - 180;
+function turnBy(dx, dy) {
+  // degrees per screen pixel, so the spot under the finger follows the finger
+  const deg = 180 / Math.PI / ((H / 2 - 8) * gk * pxPerUnit());
+  if (southUp) { dx = -dx; dy = -dy; }
+  // no stop at the poles: keep going over the top, and left-right still follows the finger when upside down
+  const flipped = Math.cos(rot[1] * Math.PI / 180) < 0;
+  rot = [wrap(rot[0] + (flipped ? -dx : dx) * deg), wrap(rot[1] - dy * deg)];
+  globeRedraw();
+}
+function turnGlobe(to, k) {
+  cancelAnimationFrame(globeAnim);
+  const r0 = rot.slice(), k0 = gk, k1 = clampK(k);
+  const dl = wrap(to[0] - r0[0]), dp = wrap(to[1] - r0[1]);   // shortest way round
+  const t0 = performance.now(), dur = reduceMotion ? 0 : 600;
+  const step = now => {
+    const t = dur ? Math.min(1, (now - t0) / dur) : 1, e = d3.easeCubicInOut(t);
+    rot = [r0[0] + dl * e, r0[1] + dp * e];
+    gk = k0 * Math.pow(k1 / k0, e);
+    globeRedraw();
+    if (t < 1) globeAnim = requestAnimationFrame(step);
+  };
+  globeAnim = requestAnimationFrame(step);
+}
+function globeWheel(ev) {
+  ev.preventDefault(); cancelAnimationFrame(globeAnim);
+  if (isZoomWheel(ev)) { gk = clampK(gk * Math.exp(-ev.deltaY * (ev.ctrlKey ? 0.01 : 0.002))); globeRedraw(); }
+  else turnBy(-ev.deltaX, -ev.deltaY);
+}
+const pointers = new Map();
+let pinchStart = null, globeMoved = false, vel = [0, 0], lastMove = 0;
+// after letting go, the globe keeps turning and slows down, like a real one
+function spin() {
+  let prev = performance.now();
+  const step = now => {
+    const dt = Math.min(48, now - prev); prev = now;
+    vel = vel.map(v => v * Math.exp(-dt / 320));
+    if (Math.hypot(vel[0], vel[1]) < 0.02) return;
+    turnBy(vel[0] * dt, vel[1] * dt);
+    globeAnim = requestAnimationFrame(step);
+  };
+  globeAnim = requestAnimationFrame(step);
+}
+svg.on("pointerdown.globe", ev => {
+  if (!isGlobe() || editing || ev.button > 0) return;
+  cancelAnimationFrame(globeAnim);
+  pointers.set(ev.pointerId, [ev.clientX, ev.clientY]);
+  globeMoved = false;
+  if (pointers.size === 2) { const [a, b] = [...pointers.values()]; pinchStart = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), k: gk }; }
+});
+svg.on("pointermove.globe", ev => {
+  if (!isGlobe() || !pointers.has(ev.pointerId)) return;
+  const [px, py] = pointers.get(ev.pointerId);
+  pointers.set(ev.pointerId, [ev.clientX, ev.clientY]);
+  if (pointers.size === 2 && pinchStart) {
+    const [a, b] = [...pointers.values()];
+    gk = clampK(pinchStart.k * Math.hypot(a[0] - b[0], a[1] - b[1]) / pinchStart.d); globeMoved = true; globeRedraw();
+  } else if (pointers.size === 1) {
+    const dx = ev.clientX - px, dy = ev.clientY - py;
+    if (Math.abs(dx) + Math.abs(dy) > 0) {
+      // hold on to the pointer only once it really drags, so a plain click still reaches what is under it
+      if (!globeMoved && Math.hypot(dx, dy) > 1) { globeMoved = true; svg.node().setPointerCapture?.(ev.pointerId); }
+      const now = performance.now(), dt = Math.max(1, now - lastMove);
+      if (dt < 100) vel = [0.7 * dx / dt + 0.3 * vel[0], 0.7 * dy / dt + 0.3 * vel[1]]; else vel = [dx / dt, dy / dt];
+      lastMove = now;
+      turnBy(dx, dy);
+    }
+  }
+});
+svg.on("pointerup.globe pointercancel.globe", ev => {
+  const was = pointers.size;
+  pointers.delete(ev.pointerId);
+  if (pointers.size < 2) pinchStart = null;
+  if (was === 1 && globeMoved && !reduceMotion && performance.now() - lastMove < 80 && Math.hypot(vel[0], vel[1]) > 0.15) spin();
+});
+// a drag that turned the globe should not also open a card
+svg.node().addEventListener("click", ev => { if (isGlobe() && globeMoved) { ev.stopPropagation(); globeMoved = false; } }, true);
+
+/* ---------- boot ---------- */
+fetch("countries-50m.json").then(r => r.json()).then(topo => {
+  const skip = new Set(["Antarctica", "Fr. S. Antarctic Lands"]);
+  const geoms = { type: "GeometryCollection", geometries: topo.objects.countries.geometries.filter(g => !skip.has(g.properties.name)) };
+  land = topojson.feature(topo, geoms).features;
+  byName = new Map(land.map(f => [f.properties.name, f]));
+  bordersGeo = topojson.mesh(topo, geoms);
+  buildGeometry();
+  setProjection();
+  setViewBox();
+
+  const defs = svg.append("defs");
+  defs.append("clipPath").attr("id", "landclip");
+  // blur over a fixed area the size of the map, so a soft edge is never cut off at the end of a stroke
+  const region = f => f.attr("filterUnits", "userSpaceOnUse").attr("x", -100).attr("y", -100).attr("width", W + 200).attr("height", H + 200);
+  haloBlur = defs.append("filter").attr("id", "halo").call(region)
+    .append("feGaussianBlur").attr("stdDeviation", HALO_BLUR);
+  coreBlur = defs.append("filter").attr("id", "core").call(region)
+    .append("feGaussianBlur").attr("stdDeviation", CORE_BLUR);
+
+  world = svg.append("g");
+  sphere = world.append("path").attr("class", "sphere");
+  landLayer = world.append("g");
+  const zones = world.append("g").attr("clip-path", "url(#landclip)");
+  const halo = zones.append("g").attr("filter", "url(#halo)");
+  haloLayer = halo.append("g"); userHaloLayer = halo.append("g");
+  const core = zones.append("g").attr("filter", "url(#core)");
+  coreLayer = core.append("g"); userCoreLayer = core.append("g");
+  borderPath = world.append("path").attr("class", "borders");
+  overlay = svg.append("g");
+
+  // clicks
+  landLayer.on("click", ev => {
+    if (editing) return;
+    const f = d3.select(ev.target).datum(); if (!f) return;
+    if (srcKind() === "advice") openAdvice(f.id, f.properties.name, ev);
+    else if (srcKind() === "zones") { focusId = null; showPop(box => { box.append(el("h2", null, f.properties.name)); box.append(el("p", "meta", (source === "gdelt" ? "Few or no news reports of fighting here in " : "Little or no fighting recorded here in ") + (srcData[source]?.year || ""))); }, ev); }
+    else if (baseIsMine()) openCountry(f.properties.name, ev);
+  });
+  zones.on("click", ev => {
+    if (editing) return;
+    const t = ev.target;
+    if (t.hasAttribute("data-nl")) return openAdvice(t.getAttribute("data-nl"), "", ev);
+    if (t.hasAttribute("data-u")) return openFighting(Number(t.getAttribute("data-u")), ev);
+    const c = t.getAttribute("data-c"); if (c) openConflict(c, ev, true);
+  });
+  zones.on("pointerover", ev => { if (ev.pointerType !== "mouse" || editing) return; hover(ev.target.getAttribute("data-c")); });
+  zones.on("pointerout", () => hover(null));
+  svg.on("click.bg", ev => { if (ev.target === svg.node() && !editing) closePop(); });
+
+  const reset = document.getElementById("zreset");
+  zoom = d3.zoom()
+    .scaleExtent([viewBox[2] / W, 24])
+    .translateExtent([[0, 0], [W, H]])
+    .filter(ev => {
+      if (isGlobe()) return false;
+      if (ev.type === "wheel") return isZoomWheel(ev);
+      return editing ? !!(ev.touches && ev.touches.length > 1) : !ev.ctrlKey && !ev.button;
+    })
+    .on("zoom", e => {
+      const wasClose = transform.k >= 4;
+      transform = e.transform;
+      world.attr("transform", transform);
+      coreBlur.attr("stdDeviation", CORE_BLUR / transform.k);
+      haloBlur.attr("stdDeviation", HALO_BLUR / Math.sqrt(transform.k));
+      drawOverlay();
+      if (wasClose !== (transform.k >= 4)) applyFocus();
+    });
+  svg.call(zoom);
+
+  // touchpad: two-finger swipe moves the map, pinch zooms; a mouse wheel zooms
+  svg.node().addEventListener("wheel", ev => {
+    if (isGlobe()) return globeWheel(ev);
+    if (isZoomWheel(ev)) return;
+    const ppu = pxPerUnit(), k = transform.k;
+    const bx = transform.x, by = transform.y;
+    svg.call(zoom.translateBy, -ev.deltaX / ppu / k, -ev.deltaY / ppu / k);
+    if (Math.abs(transform.x - bx) + Math.abs(transform.y - by) > 0.5) ev.preventDefault();   // at the edge, let the page scroll
+  }, { passive: false });
+
+  const go = () => reduceMotion ? svg : svg.transition().duration(350);
+  document.getElementById("zin").onclick = () => isGlobe() ? turnGlobe(rot, gk * 2) : go().call(zoom.scaleBy, 2);
+  document.getElementById("zout").onclick = () => isGlobe() ? turnGlobe(rot, gk / 2) : go().call(zoom.scaleBy, 0.5);
+  // already at the start: the button gives a small bounce instead of doing nothing
+  const atStart = () => {
+    if (!isGlobe()) return Math.abs(transform.k - 1) < 0.05 && Math.abs(transform.x) < 1 && Math.abs(transform.y) < 1;
+    const g0 = globeStart();
+    return gk < 1.05 && Math.abs(wrap(rot[0] - g0[0])) < 1 && Math.abs(wrap(rot[1] - g0[1])) < 1;
+  };
+  reset.onclick = () => {
+    closePop();
+    if (atStart()) { reset.classList.remove("nudge"); void reset.offsetWidth; reset.classList.add("nudge"); return; }
+    isGlobe() ? turnGlobe(globeStart(), 1) : go().call(zoom.transform, d3.zoomIdentity);
+  };
+  reset.addEventListener("animationend", () => reset.classList.remove("nudge"));
+  addEventListener("resize", () => { if (setViewBox()) svg.call(zoom.transform, d3.zoomIdentity); drawOverlay(); });
+
+  redrawAll();
+  setSource(source);
+  connectStore();
+  fetch("countries-110m.json").then(r => r.json()).then(t => {
+    const g = { type: "GeometryCollection", geometries: t.objects.countries.geometries.filter(g => !skip.has(g.properties.name)) };
+    land110 = topojson.feature(t, g).features; borders110 = topojson.mesh(t, g);
+  }).catch(() => {});
+});
+</script>
+
+</body></html>
