@@ -1647,7 +1647,7 @@ let globeFrame = 0, globeAnim = 0;
 function globeRedraw() {
   if (globeFrame) return;
   globeFrame = requestAnimationFrame(() => {
-    globeFrame = 0;
+    globeFrame = 0; if (!haloBlur) return;
     haloBlur.attr("stdDeviation", HALO_BLUR * Math.sqrt(gk));
     coreBlur.attr("stdDeviation", CORE_BLUR);
     setProjection(); drawBase(true); drawZones(); drawOverlay();
