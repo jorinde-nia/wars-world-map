@@ -72,13 +72,9 @@
   .card.full .stage { flex: 1; min-height: 0; }
   .card.full #map { height: 100%; aspect-ratio: auto !important; }
 
-  /* on larger screens the page fits the window: the map fills the space under the header, the slider stays in view */
-  @media (min-width: 641px) {
-    .wrap { box-sizing: border-box; height: 100vh; height: 100dvh; min-height: 520px; grid-template-rows: auto minmax(0, 1fr) auto; padding-block: clamp(16px, 3.2vh, 36px); }
-    .card { min-height: 0; }
-    .stage { flex: 1; min-height: 0; }
-    #map { height: 100%; aspect-ratio: auto !important; }
-  }
+  /* the map box follows the page width: square for the globe, wide for flat maps, never taller than the window */
+  #map { max-height: calc(100vh - 96px); max-height: calc(100dvh - 96px); min-height: 280px; }
+  .card.full #map { max-height: none; min-height: 0; }
 
   /* round controls */
   .btn {
@@ -398,7 +394,7 @@
 
   <footer class="foot">
     <button class="aboutbtn" id="binfo" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>About this map</button>
-    <p class="disclaimer">A personal, non-commercial project for general information only, not advice. Data comes from third parties, may be incomplete or inaccurate, and is provided as is, without warranty. Borders and names imply no position on any territory or conflict. No rights can be derived from this map and no liability is accepted for its use. All data remains the property of its sources.</p>
+    <p class="disclaimer">Disclaimer. This map is a personal, non-commercial project, provided for general information only. It is not legal, political, security, travel or any other professional advice. The data comes from third parties, has not been independently verified, and may be incomplete, outdated or inaccurate. The map is provided “as is”, without any warranty, express or implied. Borders, names and markings do not imply any position on the legal status of any territory or on responsibility for any conflict. The maker accepts no liability for any loss or damage arising from the use of, or reliance on, this map, and no rights or claims can be derived from it. Use is entirely at your own risk. All data remains the property of its respective sources.</p>
   </footer>
   <div class="infopop" id="infopop" role="dialog" hidden></div>
 </div>
@@ -1034,10 +1030,20 @@ function zoomToConflict(id) {
 
 function setViewBox() {
   const narrow = matchMedia("(max-width: 640px)").matches && !card.classList.contains("full");
-  const vb = narrow ? [200, 0, 600, 500] : [0, 0, W, H];
+  let vb;
+  if (isGlobe()) {
+    // the globe fills the shorter side of the box, whatever its shape
+    svg.style("aspect-ratio", "1 / 1");
+    const r = svg.node().getBoundingClientRect(), a = r.width > 0 && r.height > 0 ? r.width / r.height : 1;
+    vb = a >= 1 ? [W / 2 - H / 2 * a, 0, H * a, H] : [W / 2 - H / 2, H / 2 - H / 2 / a, H, H / a];
+    vb = vb.map(v => Math.round(v * 10) / 10);
+  } else {
+    vb = narrow ? [200, 0, 600, 500] : [0, 0, W, H];
+    svg.style("aspect-ratio", `${vb[2]} / ${vb[3]}`);
+  }
   const changed = vb.join() !== viewBox.join() || !svg.attr("viewBox");
   viewBox = vb;
-  svg.attr("viewBox", vb.join(" ")).style("aspect-ratio", `${vb[2]} / ${vb[3]}`);
+  svg.attr("viewBox", vb.join(" "));
   zoom?.scaleExtent([vb[2] / W, 24]);
   return changed;
 }
@@ -1372,7 +1378,7 @@ function setCentre(id) {
 function setMap(id, keepGlobe) {
   mapId = id; closePop();
   if (isGlobe() && !keepGlobe) { rot = globeStart(); gk = 1; }
-  svg.call(zoom.transform, d3.zoomIdentity);
+  setViewBox(); svg.call(zoom.transform, d3.zoomIdentity);
   setProjection(); redrawAll(); updateShowing();
 }
 
@@ -1451,7 +1457,7 @@ function applyView(v) {
   if (!v || !MAPS.some(m => m.id === v.map)) return;
   mapId = v.map; centreId = CENTRES.some(c => c.id === v.centre) ? v.centre : centreId; southUp = !!v.southUp;
   if (isGlobe()) { rot = Array.isArray(v.rot) ? v.rot.slice(0, 2) : globeStart(); gk = clampK(v.gk || 1); }
-  svg.call(zoom.transform, isGlobe() || !v.t ? d3.zoomIdentity : d3.zoomIdentity.translate(v.t[0], v.t[1]).scale(v.t[2]));
+  setViewBox(); svg.call(zoom.transform, isGlobe() || !v.t ? d3.zoomIdentity : d3.zoomIdentity.translate(v.t[0], v.t[1]).scale(v.t[2]));
   setProjection(); redrawAll(); if (isGlobe()) globeRedraw();
 }
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
