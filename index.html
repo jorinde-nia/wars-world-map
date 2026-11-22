@@ -74,7 +74,7 @@
 
   /* on larger screens the page fits the window: the map fills the space under the header, the slider stays in view */
   @media (min-width: 641px) {
-    .wrap { box-sizing: border-box; height: 100vh; height: 100dvh; min-height: 520px; grid-template-rows: auto minmax(0, 1fr); padding-block: clamp(16px, 3.2vh, 36px); }
+    .wrap { box-sizing: border-box; height: 100vh; height: 100dvh; min-height: 520px; grid-template-rows: auto minmax(0, 1fr) auto; padding-block: clamp(16px, 3.2vh, 36px); }
     .card { min-height: 0; }
     .stage { flex: 1; min-height: 0; }
     #map { height: 100%; aspect-ratio: auto !important; }
@@ -202,7 +202,40 @@
   .spinner { display: none; position: absolute; left: 50%; top: 50%; width: 32px; height: 32px; margin: -16px 0 0 -16px;
     border-radius: 50%; border: 3px solid var(--track); border-top-color: var(--ink); animation: spin .8s linear infinite; pointer-events: none; z-index: 3; }
   .booting .spinner, .stage.loading .spinner { display: block; }
-  .booting .head-r, .booting .col, .booting .timeline { visibility: hidden; }
+  .booting .head-r, .booting .col, .booting .timeline, .booting .showing { visibility: hidden; }
+
+  /* the choices in the line under the title: rounded, clickable for more about each */
+  .chip { all: unset; display: inline-flex; align-items: center; padding: 0 8px; margin: 1px 0; border-radius: 999px; line-height: 1.6;
+    box-shadow: inset 0 0 0 1px var(--track); background: var(--card); color: var(--ink); font-weight: 600; cursor: pointer; }
+  .chip:hover, .chip[aria-expanded="true"] { background: var(--control); }
+  .chip:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+
+  /* more about a choice or a source */
+  .infopop { box-sizing: border-box; position: fixed; z-index: 80; width: min(340px, calc(100vw - 32px)); background: var(--card); color: var(--ink); border-radius: 12px;
+    box-shadow: var(--shadow); padding: 14px 16px; display: grid; gap: 8px; font-size: 14px; line-height: 1.45; max-height: calc(100vh - 32px); overflow-y: auto; }
+  .infopop h3 { margin: 0; font-size: 15px; font-weight: 600; }
+  .infopop .sub { margin: -6px 0 0; color: var(--muted); font-size: 13px; }
+  .infopop p { margin: 0; color: var(--ink-soft); }
+  .infopop .meta { color: var(--muted); font-size: 13px; }
+  .infopop .acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .infopop a { color: var(--ink); }
+  .infopop .change { all: unset; cursor: pointer; padding: 4px 12px; border-radius: 999px; background: var(--control); font-size: 13px; font-weight: 600; }
+  .infopop .change:hover { background: var(--control-hover); }
+
+  /* a data source in the menu, with its own info button */
+  .menu .srcrow { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px; }
+  .menu .srcrow .srcinfo { all: unset; width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; color: var(--muted); cursor: pointer; padding: 0; }
+  .menu .srcrow .srcinfo:hover, .menu .srcrow .srcinfo[aria-expanded="true"] { background: var(--control); color: var(--ink); }
+  .menu .srcrow .srcinfo svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* under the map: about, and the disclaimer */
+  .foot { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 20px; }
+  .aboutbtn { all: unset; flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px 6px 10px; border-radius: 999px;
+    background: var(--control); color: var(--ink); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .aboutbtn:hover, .aboutbtn[aria-pressed="true"] { background: var(--control-hover); }
+  .aboutbtn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .aboutbtn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .disclaimer { flex: 1 1 420px; margin: 0; font-size: 11.5px; line-height: 1.5; color: var(--muted); max-width: 900px; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
 
@@ -284,7 +317,6 @@
         <button class="btn" id="bmap" type="button" aria-label="Map type" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2zM9 4v14M15 6v14"/></svg></button>
         <button class="btn" id="bcentre" type="button" aria-label="Centred on" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
         <button class="btn" id="bdraw" type="button" aria-label="Draw your own map" aria-pressed="false" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21.2 6.8a1 1 0 0 0-4-4L3.8 16.2a2 2 0 0 0-.5.8l-1.3 4.4a.5.5 0 0 0 .6.6l4.4-1.3a2 2 0 0 0 .8-.5z"/></svg></button>
-        <button class="btn" id="binfo" type="button" aria-label="About this map" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></button>
       </div>
       <div class="menu" id="menu" role="menu" hidden></div>
 
@@ -362,6 +394,12 @@
       <output id="timeout" for="time"></output>
     </div>
   </div>
+
+  <footer class="foot">
+    <button class="aboutbtn" id="binfo" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>About this map</button>
+    <p class="disclaimer">This map is a personal, non-commercial project. It combines data from third parties for general information only and is not advice of any kind. The data may be incomplete, delayed or inaccurate and is provided as is, without any warranty. Borders, names and markings do not imply any position on the legal status of a territory or on responsibility for a conflict. No rights can be derived from this map, and no liability is accepted for any use of it or any decision based on it. All data remains the property of its sources.</p>
+  </footer>
+  <div class="infopop" id="infopop" role="dialog" hidden></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
@@ -556,7 +594,7 @@ const DRAWN_LEGEND = ["War", "Spill-over", "Aggressor"];
 const yearOf = {}, yearCache = new Map();
 const yearsOf = id => SOURCES.find(x => x.id === id)?.years;
 const curYear = id => yearOf[id] ?? yearsOf(id)[1];
-const yearLabel = (id, y) => y === yearsOf(id)[1] && SOURCES.find(x => x.id === id).partial ? y + " so far" : String(y);
+const yearLabel = (id, y) => String(y);
 function loadYear(id, y) {
   const k = id + "/" + y;
   if (!yearCache.has(k)) yearCache.set(k, fetch(k + ".json").then(r => r.json()).catch(e => { yearCache.delete(k); throw e; }));
@@ -1062,6 +1100,7 @@ const short = iso => {
 };
 function closeMenu() {
   menu.hidden = true;
+  if (infoAnchor?.classList.contains("srcinfo")) closeInfo();
   for (const b of [bmap, bcentre, bdata, bdraw]) b.setAttribute("aria-expanded", "false");
   menuOwner = null;
 }
@@ -1078,6 +1117,12 @@ function sourceItem(s) {
     if (s.map && !s.map.shared) own.insertAdjacentHTML("beforeend", '<svg class="lock" viewBox="0 0 24 24" aria-label="Only you"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>');
     b.append(own, el("span", "when", short(s.updated)), el("span", "name", s.label));
   }, s.id === source, () => setSource(s.id));
+  // the item and its own info button share a row
+  const item = menu.lastElementChild, row = el("div", "srcrow"), ib = el("button", "srcinfo");
+  ib.type = "button"; ib.setAttribute("aria-label", "About " + s.owner + ", " + s.label); ib.setAttribute("aria-expanded", "false");
+  ib.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
+  ib.onclick = ev => { ev.stopPropagation(); openInfo(ib, box => buildSourceInfo(box, s), "right"); };
+  menu.replaceChild(row, item); row.append(item, ib);
 }
 const builders = {
   map() {
@@ -1115,7 +1160,7 @@ function openMenu(kind, btn) {
 bmap.onclick = () => openMenu("map", bmap);
 bcentre.onclick = () => openMenu("centre", bcentre);
 bdata.onclick = () => openMenu("data", bdata);
-document.addEventListener("pointerdown", ev => { if (!menu.hidden && !menu.contains(ev.target) && !ev.target.closest(".left")) closeMenu(); });
+document.addEventListener("pointerdown", ev => { if (!menu.hidden && !menu.contains(ev.target) && !ev.target.closest(".left") && !infopop.contains(ev.target)) closeMenu(); });
 /* ---------- hover labels on every round button ---------- */
 const stageEl = document.getElementById("stage");
 const tip = el("div", "tip"); tip.hidden = true; tip.setAttribute("aria-hidden", "true"); stageEl.append(tip);
@@ -1221,15 +1266,102 @@ document.addEventListener("pointerdown", ev => {
 const tzCity = (() => { try { const z = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; return z.includes("/") ? z.split("/").pop().replace(/_/g, " ") : ""; } catch { return ""; } })();
 function updateShowing() {
   const s = srcInfo(source), m = MAPS.find(x => x.id === mapId);
-  const c = centre(), where = c.id === "you" ? (tzCity ? "your region (" + tzCity + ")" : "your region") : c.label;
+  const c = centre(), where = c.id === "you" ? (tzCity ? "Your region (" + tzCity + ")" : "Your region") : c.label;
   const box = document.getElementById("showing"); box.replaceChildren();
-  const b = t => el("b", null, t);
-  box.append("Showing ", b(isGlobe() ? "a globe" : m.label), " centred on ", b(where), southUp ? ", south at the top, with " : ", with ");
-  if (source === "draft") box.append(b("a new drawing"), ".");
-  else if (s.kind === "drawn") box.append(b(s.label), " drawn by " + s.owner + ".");
-  else if (s.years) box.append(b(s.label.replace(" (UCDP)", "").replace(/^./, ch => ch.toLowerCase()) + " for " + yearLabel(source, curYear(source))), " from " + s.owner + ".");
-  else box.append(b(s.label.replace(/^./, ch => ch.toLowerCase())), " from " + s.owner + ".");
+  const chip = (text, kind) => { const b = el("button", "chip", text); b.type = "button"; b.dataset.info = kind; b.setAttribute("aria-expanded", "false"); b.setAttribute("aria-haspopup", "dialog"); return b; };
+  box.append("Showing ", chip(isGlobe() ? "Globe" : m.label, "map"), " centred on ", chip(where, "centre"), southUp ? ", south at the top, with " : " with ");
+  if (source === "draft") { box.append(el("b", null, "a new drawing"), "."); return; }
+  box.append(chip(s.label, "source"), (s.kind === "drawn" ? " by " : " from ") + s.owner + (s.years ? ", " + curYear(source) : "") + ".");
+  if (s.updated) box.append(" Last updated " + fmt(s.updated) + ".");
 }
+
+/* ---------- more about a choice or a source ---------- */
+const MAP_INFO = {
+  globe: "An orthographic projection: the earth as seen from space, one half at a time. Drag to turn it. Sizes and shapes are true near the centre and squeezed towards the edge.",
+  equalearth: "An equal-area projection from 2018. Every country keeps its true size compared with the others; shapes bend a little towards the edges.",
+  naturalearth: "A compromise projection that balances size and shape. It is not equal-area.",
+  robinson: "A compromise projection used in many atlases. It is not equal-area: areas far from the equator look somewhat larger.",
+  mercator: "Keeps shapes and directions, which is why it is used for navigation, but strongly enlarges areas far from the equator.",
+  gallpeters: "An equal-area projection: sizes are true, while shapes are stretched near the equator and flattened near the poles.",
+  polar: "An azimuthal equidistant projection centred on the North Pole, as in the emblem of the United Nations. Distances from the pole are true.",
+};
+const GOV_LINK = { br: "https://www.gov.br/mre/", cn: "http://cs.mfa.gov.cn/", de: "https://www.auswaertiges-amt.de/", nl: "https://www.nederlandwereldwijd.nl/reisadvies", ru: "https://www.mid.ru/", us: "https://travel.state.gov/" };
+const SRC_INFO = {
+  ucdp: { text: "Every event of organised violence with at least one death, recorded by the Uppsala Conflict Data Program: fighting between states and armed groups, fighting between armed groups, and violence against civilians.",
+    cover: "1989 to 2025 from the final yearly release. 2026 is preliminary data, up to 5 November.",
+    method: "Regions show deaths per 1,000 km² in a year. Arrows show a country's forces fighting on another country's territory, with 25 or more deaths.", link: "https://ucdp.uu.se/" },
+  acled: { text: "Political violence recorded by Armed Conflict Location & Event Data (ACLED), an independent conflict monitor: battles, explosions and remote violence, and violence against civilians.",
+    cover: "2018 to the week of 7 November 2026, from the free aggregated data: deaths per province per week.",
+    method: "Regions use the same thresholds as UCDP. There are no arrows, because the free data does not name the sides.", link: "https://acleddata.com/" },
+  gdelt: { text: "Events coded automatically from news reports worldwide by the GDELT Project. It shows where the news places fighting, not where fighting was verified.",
+    cover: "2015 to 15 November 2026, sampled on the 1st and 15th of each month.",
+    method: "Regions show each area's share of the year's reports. Arrows show a country reported using force in another country.", link: "https://www.gdeltproject.org/" },
+  cow: { text: "Militarized Interstate Disputes from the Correlates of War Project: threats, displays and uses of force between states.",
+    cover: "1816 to 2014, version 5.0. Civil wars are not included.",
+    method: "Countries are coloured by the highest level reached that year: war or use of force. Arrows run from the side that took the first militarized action.", link: "https://correlatesofwar.org/data-sets/mids/" },
+  un: { text: "The situations in the UN Secretary-General's yearly report on children and armed conflict, where the United Nations verified grave violations against children.",
+    cover: "Report of 16 June 2026, covering 2025.", link: "https://childrenandarmedconflict.un.org/" },
+  au: { text: "The conflicts on the agenda of the Peace and Security Council of the African Union.",
+    cover: "Provisional programme of work for November 2026.", link: "https://www.peaceau.org/" },
+  mine: { text: "Drawn by hand by Jorinde Hoek from news reports. Approximate, and a personal view." },
+};
+function srcDetails(s) {
+  const d = SRC_INFO[s.id] || (s.kind === "advice" ? { text: "Official travel advice from the foreign ministry of " + (s.owner === "United States" || s.owner === "Netherlands" ? "the " + s.owner : s.owner) + ". Only the two highest warning levels are shown.",
+    method: "Travel advice measures the risk to travellers, not how intense a conflict is, and is mostly given per country.", link: GOV_LINK[s.id] } : s.map ? { text: "A map drawn by hand." } : {});
+  return d;
+}
+const infopop = document.getElementById("infopop");
+let infoAnchor = null;
+function closeInfo() {
+  infopop.hidden = true;
+  infoAnchor?.setAttribute("aria-expanded", "false"); infoAnchor = null;
+}
+function openInfo(anchor, build, side) {
+  if (infoAnchor === anchor) return closeInfo();
+  closeInfo(); hideTip?.();
+  infopop.replaceChildren(); build(infopop);
+  infopop.hidden = false; infoAnchor = anchor; anchor.setAttribute("aria-expanded", "true");
+  const r = anchor.getBoundingClientRect(), w = infopop.offsetWidth, h = infopop.offsetHeight, vw = innerWidth, vh = innerHeight;
+  let x, y;
+  if (side === "right" && r.right + 8 + w <= vw - 8) { x = r.right + 8; y = Math.min(r.top - 8, vh - h - 8); }
+  else { x = Math.min(Math.max(8, r.left), vw - w - 8); y = r.bottom + 8 + h <= vh - 8 ? r.bottom + 8 : Math.max(8, r.top - h - 8); }
+  infopop.style.left = x + "px"; infopop.style.top = Math.max(8, y) + "px";
+}
+function buildSourceInfo(box, s) {
+  const d = srcDetails(s);
+  box.append(el("h3", null, s.owner), el("p", "sub", s.label));
+  if (d.text) box.append(el("p", null, d.text));
+  if (d.cover) box.append(el("p", null, d.cover));
+  if (d.method) box.append(el("p", null, d.method));
+  if (s.updated) box.append(el("p", "meta", "Last updated " + fmt(s.updated) + "."));
+  if (d.link) { const acts = el("div", "acts"); sourceLink(acts, "Go to the source", d.link); box.append(acts); }
+}
+const changeBtn = (box, text, open) => { const acts = el("div", "acts"), b = el("button", "change", text); b.type = "button"; b.onclick = () => { closeInfo(); open(); }; acts.append(b); box.append(acts); };
+document.getElementById("showing").addEventListener("click", ev => {
+  const b = ev.target.closest(".chip"); if (!b) return;
+  const kind = b.dataset.info;
+  openInfo(b, box => {
+    if (kind === "map") {
+      const m = MAPS.find(x => x.id === mapId);
+      box.append(el("h3", null, isGlobe() ? "Globe" : m.label), el("p", null, MAP_INFO[mapId] || ""));
+      changeBtn(box, "Change map type", () => openMenu("map", bmap));
+    } else if (kind === "centre") {
+      const c = centre();
+      box.append(el("h3", null, c.id === "you" ? "Your region" : c.label));
+      if (c.id === "you") {
+        let tz = ""; try { tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch {}
+        box.append(el("p", null, "The map is centred on " + (tzCity || "your region") + ", estimated from the time zone set on your device" + (tz ? " (" + tz + ")" : "") + ". Your location is not looked up and nothing is sent."));
+      } else box.append(el("p", null, "The map is centred on " + c.label + ", at " + Math.abs(c.lon) + "°" + (c.lon < 0 ? "W" : "E") + " and " + Math.abs(c.lat) + "°" + (c.lat < 0 ? "S" : "N") + "."));
+      if (southUp) box.append(el("p", null, "South is at the top."));
+      changeBtn(box, "Change centre", () => openMenu("centre", bcentre));
+    } else {
+      buildSourceInfo(box, srcInfo(source));
+      changeBtn(box, "Change data", () => openMenu("data", bdata));
+    }
+  });
+});
+document.addEventListener("pointerdown", ev => { if (!infopop.hidden && !infopop.contains(ev.target) && ev.target !== infoAnchor && !ev.target.closest?.(".srcinfo")) closeInfo(); });
+addEventListener("resize", () => closeInfo());
 
 function setCentre(id) {
   centreId = id; updateShowing();
@@ -1260,6 +1392,7 @@ document.addEventListener("fullscreenchange", () => { if (!document.fullscreenEl
 
 document.addEventListener("keydown", e => {
   if (e.key !== "Escape") return;
+  if (!infopop.hidden) { const a = infoAnchor; closeInfo(); a?.focus(); return; }
   if (!lgpop.hidden) { lgPinned = false; setLegendPop(false); return; }
   if (!menu.hidden) { const o = { map: bmap, centre: bcentre, data: bdata, draw: bdraw }[menuOwner]; closeMenu(); o?.focus(); }
   else if (!pop.hidden) closePop();
