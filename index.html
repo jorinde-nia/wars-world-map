@@ -247,8 +247,9 @@
   .u-halo, .u-spill { fill: none; stroke: var(--spill); stroke-linecap: round; stroke-linejoin: round; }
   .zc { cursor: pointer; transition: opacity 160ms ease; }
   .arrow { fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; pointer-events: none; transition: opacity 160ms ease; }
-  .head { fill: var(--ink); pointer-events: none; transition: opacity 160ms ease; }
-  .card:not(.editing) #map.noarrows :is(.arrow, .head, .hit) { display: none; }
+  .head { fill: var(--ink); stroke: var(--land); stroke-linejoin: round; paint-order: stroke; pointer-events: none; transition: opacity 160ms ease; }
+  .case { fill: none; stroke: var(--land); stroke-linecap: round; opacity: 0.85; pointer-events: none; transition: opacity 160ms ease; }
+  .card:not(.editing) #map.noarrows :is(.arrow, .case, .head, .hit) { display: none; }
   /* a small switch to show or hide the arrows */
   .tgl { all: unset; position: relative; flex: none; width: 26px; height: 16px; margin-left: 2px; border-radius: 999px; background: var(--ink); cursor: pointer; transition: background 160ms ease; }
   .tgl::after { content: ""; position: absolute; top: 2px; left: 12px; width: 12px; height: 12px; border-radius: 50%; background: var(--card); transition: left 160ms ease; }
@@ -784,7 +785,7 @@ function drawOverlay() {
   const kind = srcKind();
   if (kind !== "drawn" && !srcData[source]?.arrows) return;
   const ppu = pxPerUnit();
-  const head = 10 / ppu, minLen = 30 / ppu, sw = 1.6 / ppu;
+  const head = 9 / ppu, minLen = 30 / ppu, sw = 1.5 / ppu;
   const hidden = new Set(mine.hidden);
   if (kind !== "drawn") {
     for (const [i, a] of (srcData[source]?.arrows || []).entries()) {
@@ -829,8 +830,9 @@ function flatArrow(a, head, minLen, sw, ppu) {
   const curve = `M${x1},${y1} Q${cx},${cy} ${ex},${ey}`;
   const g = overlay.append("g");
   if (a.c) g.attr("data-c", a.c);
+  g.append("path").attr("class", "case").attr("stroke-width", sw + 3 / ppu).attr("d", curve);
   g.append("path").attr("class", "arrow").attr("stroke-width", sw).attr("d", curve);
-  g.append("path").attr("class", "head").attr("d", `M${x2},${y2} L${x2 - tx * head - ty * w},${y2 - ty * head + tx * w} L${x2 - tx * head + ty * w},${y2 - ty * head - tx * w} Z`);
+  g.append("path").attr("class", "head").attr("stroke-width", 2 / ppu).attr("d", `M${x2},${y2} L${x2 - tx * head - ty * w},${y2 - ty * head + tx * w} L${x2 - tx * head + ty * w},${y2 - ty * head - tx * w} Z`);
   g.append("path").attr("class", "hit").attr("stroke-width", 16 / ppu).attr("d", curve)
     .on("click", ev => { ev.stopPropagation(); onArrow(a, ev); })
     .on("pointerenter", ev => { if (ev.pointerType === "mouse" && a.c && !editing) hover(a.c); })
@@ -841,16 +843,23 @@ function flatArrow(a, head, minLen, sw, ppu) {
 function globeArrow(a, head, sw, ppu) {
   if (!a.own && hiddenSet().has(a.key)) return;
   const at = d3.geoInterpolate(a.from, a.to);
-  const pts = d3.range(0, 1.0001, 1 / 48).map(at).filter(visible).map(p => proj(p));
+  let pts = d3.range(0, 1.0001, 1 / 48).map(at).filter(visible).map(p => proj(p));
   if (pts.length < 2) return;
+  // bend to the left of the direction of travel, as on flat maps, so arrows both ways and arrows from one place fan apart
+  const bend = a.bend ?? (a.own ? 0.22 : 0);
+  if (bend) {
+    const [ax, ay] = pts[0], [bx, by] = pts[pts.length - 1], dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy) || 1, n = pts.length - 1;
+    pts = pts.map(([x, y], i) => { const k = Math.sin(Math.PI * i / n) * len * bend / 2; return [x + dy / len * k, y - dx / len * k]; });
+  }
   const [x2, y2] = pts[pts.length - 1];
   let i = pts.length - 2; while (i > 0 && Math.hypot(x2 - pts[i][0], y2 - pts[i][1]) < head) i--;
   let tx = x2 - pts[i][0], ty = y2 - pts[i][1]; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
   const w = head * 0.55, line = "M" + pts.slice(0, -1).map(p => p.join(",")).join("L") + `L${x2 - tx * head * 0.8},${y2 - ty * head * 0.8}`;
   const g = overlay.append("g");
   if (a.c) g.attr("data-c", a.c);
+  g.append("path").attr("class", "case").attr("stroke-width", sw + 3 / ppu).attr("d", line);
   g.append("path").attr("class", "arrow").attr("stroke-width", sw).attr("d", line);
-  g.append("path").attr("class", "head").attr("d", `M${x2},${y2} L${x2 - tx * head - ty * w},${y2 - ty * head + tx * w} L${x2 - tx * head + ty * w},${y2 - ty * head - tx * w} Z`);
+  g.append("path").attr("class", "head").attr("stroke-width", 2 / ppu).attr("d", `M${x2},${y2} L${x2 - tx * head - ty * w},${y2 - ty * head + tx * w} L${x2 - tx * head + ty * w},${y2 - ty * head - tx * w} Z`);
   g.append("path").attr("class", "hit").attr("stroke-width", 16 / ppu).attr("d", line)
     .on("click", ev => { ev.stopPropagation(); onArrow(a, ev); })
     .on("pointerenter", ev => { if (ev.pointerType === "mouse" && a.c && !editing) hover(a.c); })
