@@ -247,10 +247,8 @@
   .u-halo, .u-spill { fill: none; stroke: var(--spill); stroke-linecap: round; stroke-linejoin: round; }
   .zc { cursor: pointer; transition: opacity 160ms ease; }
   .arrow { fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; pointer-events: none; transition: opacity 160ms ease; }
-  .head { fill: var(--ink); stroke: var(--land); stroke-linejoin: round; paint-order: stroke; pointer-events: none; transition: opacity 160ms ease; }
-  .shaft { fill: var(--ink); pointer-events: none; transition: opacity 160ms ease; }
-  #map .minor { opacity: 0.6; }
-  .card:not(.editing) #map.noarrows :is(.shaft, .head, .hit) { display: none; }
+  .head { fill: var(--ink); pointer-events: none; transition: opacity 160ms ease; }
+  .card:not(.editing) #map.noarrows :is(.arrow, .head, .hit) { display: none; }
   /* a small switch to show or hide the arrows */
   .tgl { all: unset; position: relative; flex: none; width: 26px; height: 16px; margin-left: 2px; border-radius: 999px; background: var(--ink); cursor: pointer; transition: background 160ms ease; }
   .tgl::after { content: ""; position: absolute; top: 2px; left: 12px; width: 12px; height: 12px; border-radius: 50%; background: var(--card); transition: left 160ms ease; }
@@ -357,7 +355,7 @@
           <li>Each UCDP event is spread over the map as a Gaussian kernel of 60 km, or 110 km when the event is placed only within a province or near a named place.</li>
           <li>Events placed only within a country, or at sea, are left out.</li>
           <li>Deaths are UCDP's best estimate, summed per 1,000 km² for each calendar year. Red is 5 deaths or more, light red 0.8 or more. Areas under 3,000 km² are left out. 2026 covers part of the year only.</li>
-          <li>An arrow is drawn when the government of one country is a party to fighting on another country's territory, against that country's government, a group there or civilians, with 25 or more deaths in the year. It runs from the capital to the death-weighted centre of those events. When several governments fight together, each is counted with the full number of deaths. Thicker arrows mean more deaths; arrows with fewer than 100 deaths are lighter.</li>
+          <li>An arrow is drawn when the government of one country is a party to fighting on another country's territory, against that country's government, a group there or civilians, with 25 or more deaths in the year. It runs from the capital to the death-weighted centre of those events. When several governments fight together, each is counted with the full number of deaths.</li>
         </ul>
         <h3>Method for political violence (ACLED)</h3>
         <ul>
@@ -856,10 +854,9 @@ function warZoneAt(to) {
   return list.find(f => d3.geoContains(f, to)) || null;
 }
 
-// line weight follows the number of deaths, so the big flows stand out and the small ones stay quiet
-const arrowWeight = a => a.own || !a.deaths ? 1.5 : Math.max(1.1, Math.min(2.8, 1.1 + 0.6 * Math.log10(a.deaths / 25)));
+// every arrow looks the same: one weight, one colour
 function drawArrow(a, pts, ppu) {
-  const wt = arrowWeight(a), sw = wt / ppu, head = (5 + 1.6 * wt) / ppu, hw = head * 0.5;
+  const sw = 1.5 / ppu, head = 8 / ppu, hw = head * 0.5;
   const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
   const L = cum[cum.length - 1]; if (L <= 0) return;
   const at = d => { let i = 1; while (i < cum.length - 1 && cum[i] < d) i++; const f = (d - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1); return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * f, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * f]; };
@@ -890,21 +887,10 @@ function drawArrow(a, pts, ppu) {
   const [x2, y2] = at(end), [bx, by] = at(Math.max(g0, end - head));
   let tx = x2 - bx, ty = y2 - by; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl;
   const d = "M" + line.map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join("L");
-  // the shaft tapers from a hairline at the start to full width at the head, so arrows leaving one place never form a knot
-  const lc = [0]; for (let i = 1; i < line.length; i++) lc.push(lc[i - 1] + Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]));
-  const LL = lc[lc.length - 1] || 1, left = [], right = [];
-  line.forEach((p, i) => {
-    const q0 = line[Math.max(0, i - 1)], q1 = line[Math.min(line.length - 1, i + 1)];
-    let nx = -(q1[1] - q0[1]), ny = q1[0] - q0[0]; const nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl;
-    const hw2 = sw * (0.3 + 0.7 * lc[i] / LL) / 2;
-    left.push([p[0] + nx * hw2, p[1] + ny * hw2]); right.push([p[0] - nx * hw2, p[1] - ny * hw2]);
-  });
-  const shaft = "M" + left.concat(right.reverse()).map(p => p[0].toFixed(2) + "," + p[1].toFixed(2)).join("L") + "Z";
   const g = overlay.append("g");
   if (a.c) g.attr("data-c", a.c);
-  if (!a.own && a.deaths && a.deaths < 100) g.classed("minor", true);
-  g.append("path").attr("class", "shaft").attr("d", shaft);
-  g.append("path").attr("class", "head").attr("stroke-width", 1 / ppu).attr("d", `M${x2},${y2} L${x2 - tx * head - ty * hw},${y2 - ty * head + tx * hw} L${x2 - tx * head + ty * hw},${y2 - ty * head - tx * hw} Z`);
+  g.append("path").attr("class", "arrow").attr("stroke-width", sw).attr("d", d);
+  g.append("path").attr("class", "head").attr("d", `M${x2},${y2} L${x2 - tx * head - ty * hw},${y2 - ty * head + tx * hw} L${x2 - tx * head + ty * hw},${y2 - ty * head - tx * hw} Z`);
   g.append("path").attr("class", "hit").attr("stroke-width", 16 / ppu).attr("d", d)
     .on("click", ev => { ev.stopPropagation(); onArrow(a, ev); })
     .on("pointerenter", ev => { if (ev.pointerType === "mouse" && a.c && !editing) hover(a.c); })
