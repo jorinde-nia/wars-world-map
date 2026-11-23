@@ -781,8 +781,10 @@ function pxPerUnit() {
   return m ? m.a : (svg.node().clientWidth || viewBox[2]) / viewBox[2];
 }
 
+const headTips = [];
 function drawOverlay() {
   overlay.selectAll("*").remove();
+  headTips.length = 0;
   const kind = srcKind();
   if (kind !== "drawn" && !srcData[source]?.arrows) return;
   const ppu = pxPerUnit();
@@ -845,6 +847,15 @@ function globeArrow(a, head, sw, ppu) {
   drawArrow(a, pts, ppu);
 }
 
+// the area of heavy fighting an arrow points into, if any
+const warZoneCache = new WeakMap();
+function warZoneAt(to) {
+  const data = srcData[source]; if (!data?.zones) return null;
+  let list = warZoneCache.get(data);
+  if (!list) { list = data.zones.filter(z => z.level === "war").map(z => ({ type: "Polygon", coordinates: z.g })); warZoneCache.set(data, list); }
+  return list.find(f => d3.geoContains(f, to)) || null;
+}
+
 // line weight follows the number of deaths, so the big flows stand out and the small ones stay quiet
 const arrowWeight = a => a.own || !a.deaths ? 1.5 : Math.max(1.1, Math.min(2.8, 1.1 + 0.6 * Math.log10(a.deaths / 25)));
 function drawArrow(a, pts, ppu) {
@@ -854,7 +865,26 @@ function drawArrow(a, pts, ppu) {
   const at = d => { let i = 1; while (i < cum.length - 1 && cum[i] < d) i++; const f = (d - cum[i - 1]) / ((cum[i] - cum[i - 1]) || 1); return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * f, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * f]; };
   // leave a little room at both ends, so arrows that meet at one place sit around it instead of piling up
   let g0 = 2 / ppu, g1 = 4 / ppu;
-  if (L < g0 + g1 + head * 1.5) { const k = Math.max(0, (L - head * 1.5) / (g0 + g1)); g0 *= k; g1 *= k; }
+  // an arrow into an area of heavy fighting stops at its edge, so the fighting itself stays uncovered
+  const zone = a.own ? null : warZoneAt(a.to);
+  if (zone) {
+    const inside = d => { const p = at(d), q = proj.invert(isGlobe() ? p : transform.invert(p)); return !!q && d3.geoContains(zone, q); };
+    let i = pts.length - 1; while (i >= 0 && inside(cum[i])) i--;
+    if (i >= 0 && i < pts.length - 1) {
+      let lo = cum[i], hi = cum[i + 1];
+      for (let k = 0; k < 10; k++) { const m = (lo + hi) / 2; inside(m) ? hi = m : lo = m; }
+      const stop = L - lo + 3 / ppu;
+      if (L - stop - g0 > head * 2) g1 = stop;
+    }
+  }
+  if (g1 === 4 / ppu && L < g0 + g1 + head * 1.5) { const k = Math.max(0, (L - head * 1.5) / (g0 + g1)); g0 *= k; g1 *= k; }
+  // a head that would land on another one stops a little earlier
+  for (let k = 0; k < 4; k++) {
+    const t = at(L - g1);
+    if (!headTips.some(h => Math.hypot(h[0] - t[0], h[1] - t[1]) < head * 1.4) || L - g1 - g0 - head * 1.4 < head * 2) break;
+    g1 += head * 1.4;
+  }
+  headTips.push(at(L - g1));
   const end = L - g1, lineEnd = end - head * 0.7;
   const line = [at(g0)].concat(pts.filter((p, i) => cum[i] > g0 && cum[i] < lineEnd), [at(lineEnd)]);
   const [x2, y2] = at(end), [bx, by] = at(Math.max(g0, end - head));
